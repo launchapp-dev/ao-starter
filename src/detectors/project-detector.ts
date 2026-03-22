@@ -123,7 +123,7 @@ export class ProjectDetector {
     return null;
   }
 
-  private async detectRust(): Promise<DetectorResult | null> {
+  async detectRust(): Promise<DetectorResult | null> {
     const cargoToml = await this.fileExists('Cargo.toml');
     if (cargoToml) {
       const cargoWorkspace = await this.readFile('Cargo.toml');
@@ -139,7 +139,7 @@ export class ProjectDetector {
     return null;
   }
 
-  private async detectPython(): Promise<DetectorResult | null> {
+  async detectPython(): Promise<DetectorResult | null> {
     const pyprojectToml = await this.fileExists('pyproject.toml');
     const setupPy = await this.fileExists('setup.py');
     const requirementsTxt = await this.fileExists('requirements.txt');
