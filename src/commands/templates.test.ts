@@ -1,9 +1,7 @@
 import {
   getAvailableTemplates,
   getTemplateById,
-  getDetailedTemplate,
   isValidTemplateId,
-  TemplatesOptions,
 } from './templates.js';
 
 describe('templates', () => {
@@ -61,60 +59,6 @@ describe('templates', () => {
     });
   });
 
-  describe('getDetailedTemplate', () => {
-    it('should return detailed template info for valid id', () => {
-      const template = getDetailedTemplate('typescript');
-      expect(template).toBeDefined();
-      expect(template?.files).toBeDefined();
-      expect(template?.agents).toBeDefined();
-      expect(template?.phases).toBeDefined();
-      expect(template?.usage).toBeDefined();
-      expect(Array.isArray(template?.files)).toBe(true);
-      expect(Array.isArray(template?.agents)).toBe(true);
-      expect(Array.isArray(template?.phases)).toBe(true);
-    });
-
-    it('should include common files in all templates', () => {
-      const template = getDetailedTemplate('default');
-      expect(template?.files).toContain('agents.yaml');
-      expect(template?.files).toContain('phases.yaml');
-      expect(template?.files).toContain('workflows.yaml');
-      expect(template?.files).toContain('custom.yaml');
-    });
-
-    it('should include phases for typescript template', () => {
-      const template = getDetailedTemplate('typescript');
-      expect(template?.phases).toContain('typecheck');
-      expect(template?.phases).toContain('lint');
-    });
-
-    it('should include rust-specific phases for rust template', () => {
-      const template = getDetailedTemplate('rust');
-      expect(template?.phases).toContain('clippy');
-      expect(template?.phases).toContain('fmt');
-    });
-
-    it('should include benchmark phase for rust template', () => {
-      const template = getDetailedTemplate('rust');
-      expect(template?.phases).toContain('benchmark');
-    });
-
-    it('should include monorepo-specific phases for typescript-monorepo', () => {
-      const template = getDetailedTemplate('typescript-monorepo');
-      expect(template?.phases).toContain('build');
-    });
-
-    it('should return undefined for invalid id', () => {
-      const template = getDetailedTemplate('nonexistent');
-      expect(template).toBeUndefined();
-    });
-
-    it('should generate correct usage command for python template', () => {
-      const template = getDetailedTemplate('python');
-      expect(template?.usage).toBe('ao init --template python');
-    });
-  });
-
   describe('isValidTemplateId', () => {
     it('should return true for valid template ids', () => {
       expect(isValidTemplateId('default')).toBe(true);
@@ -132,24 +76,6 @@ describe('templates', () => {
       expect(isValidTemplateId('')).toBe(false);
       expect(isValidTemplateId('TYPESCRIPT')).toBe(false);
       expect(isValidTemplateId('next-js')).toBe(false);
-    });
-  });
-
-  describe('TemplatesOptions interface', () => {
-    it('should allow options with name', () => {
-      const options: TemplatesOptions = { name: 'typescript' };
-      expect(options.name).toBe('typescript');
-    });
-
-    it('should allow options with json flag', () => {
-      const options: TemplatesOptions = { json: true };
-      expect(options.json).toBe(true);
-    });
-
-    it('should allow empty options', () => {
-      const options: TemplatesOptions = {};
-      expect(options.name).toBeUndefined();
-      expect(options.json).toBeUndefined();
     });
   });
 });

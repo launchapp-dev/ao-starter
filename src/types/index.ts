@@ -13,6 +13,10 @@ export type ProjectType =
   | 'rust'
   | 'rust-workspace'
   | 'python'
+  | 'bun'
+  | 'deno'
+  | 'go'
+  | 'elixir'
   | 'unknown';
 
 /**
@@ -28,12 +32,16 @@ export type Framework =
   | 'Python'
   | 'Poetry'
   | 'Pipenv'
+  | 'Bun'
+  | 'Deno'
+  | 'Go'
+  | 'Elixir'
   | undefined;
 
 /**
  * Programming language detected
  */
-export type Language = 'TypeScript' | 'JavaScript' | 'Rust' | 'Python' | 'Unknown';
+export type Language = 'TypeScript' | 'JavaScript' | 'Rust' | 'Python' | 'Go' | 'Elixir' | 'Unknown';
 
 /**
  * Detection result from project analysis
