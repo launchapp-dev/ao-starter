@@ -1,0 +1,30 @@
+# Source files
+src/
+tsconfig.json
+*.ts
+
+# Development files
+.git/
+.github/
+.vscode/
+.idea/
+
+# Test files
+**/*.test.ts
+**/*.spec.ts
+coverage/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Config files
+.mcp.json
+.ao/
+VISION.md
+
+# Misc
+.DS_Store
+*.log
+.env*
