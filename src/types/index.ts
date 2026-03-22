@@ -97,6 +97,8 @@ export interface InitOptions {
 export interface ProjectMetadata {
   /** Detected project type */
   type: ProjectType;
+  /** Confidence score (0-100) */
+  confidence: number;
   /** Framework name if detected */
   framework?: Framework;
   /** Programming language */
