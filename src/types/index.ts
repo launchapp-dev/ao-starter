@@ -79,6 +79,42 @@ export interface InitOptions {
   skipDetect: boolean;
   /** Preview changes without writing files */
   dryRun: boolean;
+  /** Force override auto-detection */
+  force?: boolean;
+}
+
+/**
+ * Project metadata returned by detection
+ */
+export interface ProjectMetadata {
+  /** Detected project type */
+  type: ProjectType;
+  /** Framework name if detected */
+  framework?: Framework;
+  /** Programming language */
+  language: Language;
+  /** Whether project is a monorepo */
+  monorepo: boolean;
+  /** Package names in monorepo */
+  packages: string[];
+  /** Root package name if available */
+  rootPackage?: string;
+  /** Detected build tool */
+  buildTool?: string;
+  /** File indicators that led to detection */
+  indicators: string[];
+  /** Recommendations for the user */
+  recommendations: string[];
+}
+
+/**
+ * Detection indicators for debugging/display
+ */
+export interface DetectionIndicators {
+  /** Files that were checked */
+  files: string[];
+  /** Why the detection was chosen */
+  reason: string;
 }
 
 /**

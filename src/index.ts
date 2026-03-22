@@ -65,6 +65,10 @@ For more information, see https://github.com/launchapp-dev/ao-starter`
       'Skip automatic project detection'
     )
     .option(
+      '--force',
+      'Force override auto-detection even when a .ao directory exists'
+    )
+    .option(
       '--dry-run',
       'Preview changes without writing files'
     )
@@ -74,6 +78,7 @@ For more information, see https://github.com/launchapp-dev/ao-starter`
   prog
     .command(COMMANDS.DETECT)
     .description('Detect project type and show recommendations')
+    .option('--json', 'Output in JSON format')
     .action(detectCommand);
 
   return prog;

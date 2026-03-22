@@ -20,6 +20,8 @@ export interface InitOptions {
   skipDetect: boolean;
   /** Preview changes without writing files */
   dryRun: boolean;
+  /** Force override auto-detection */
+  force?: boolean;
 }
 
 /**
@@ -31,6 +33,7 @@ export type initOptions = {
   output: string;
   skipDetect: boolean;
   dryRun: boolean;
+  force?: boolean;
 };
 
 /**
@@ -186,9 +189,9 @@ export async function initCommand(options: initOptions): Promise<void> {
     // Check write permissions if directory exists
     await checkWritePermission(outputDir);
 
-    // Check for existing files (only in non-dry-run mode)
+    // Check for existing files (only in non-dry-run mode and non-force mode)
     const effectiveProjectType = templateId || 'default';
-    if (!options.dryRun) {
+    if (!options.dryRun && !options.force) {
       const existingFiles = await checkExistingFiles(outputDir, effectiveProjectType);
       if (existingFiles.length > 0) {
         console.log(chalk.yellow('Warning: The following files already exist and will be overwritten:\n'));
@@ -201,8 +204,8 @@ export async function initCommand(options: initOptions): Promise<void> {
 
     let projectType = templateId;
 
-    // Auto-detect project type if not specified
-    if (!options.skipDetect && !projectType) {
+    // Auto-detect project type if not specified and --force is not used
+    if (!options.skipDetect && !projectType && !options.force) {
       const detector = new ProjectDetector();
       const detection = await detector.detect();
       projectType = detection.type;
@@ -210,6 +213,14 @@ export async function initCommand(options: initOptions): Promise<void> {
       if (detection.framework) {
         console.log(chalk.gray(`Framework: ${chalk.white(detection.framework)}`));
       }
+      console.log();
+    } else if (options.force && projectType) {
+      console.log(chalk.gray(`Using specified template: ${chalk.white(projectType)}`));
+      console.log();
+    } else if (options.force && !options.template) {
+      // With --force, use 'default' template to bypass detection
+      projectType = 'default';
+      console.log(chalk.yellow('Note: --force bypasses auto-detection, using default template'));
       console.log();
     }
 
