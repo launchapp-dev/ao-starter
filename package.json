@@ -4,7 +4,8 @@
   "description": "CLI tool to scaffold AO workflows for any project",
   "type": "module",
   "bin": {
-    "create-ao": "./dist/index.js"
+    "create-ao": "./dist/index.js",
+    "ao": "./dist/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
