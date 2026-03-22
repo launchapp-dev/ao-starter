@@ -1,61 +1,144 @@
 import fs from 'fs-extra';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import Handlebars from 'handlebars';
+import type {
+  GeneratorOptions,
+  GenerationResult,
+  TemplateContext,
+  TemplateFile,
+} from './types.js';
 
-export interface GeneratorOptions {
-  projectType: string;
-  outputDir: string;
-  dryRun: boolean;
-}
+// Get the directory of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+// Templates directory
+const TEMPLATES_DIR = path.join(__dirname);
+
+/**
+ * Template generator for AO configuration files
+ * Loads Handlebars templates from the templates directory
+ */
 export class TemplateGenerator {
+  private handlebars: typeof Handlebars;
+
   constructor() {
-    // Templates are inline for now, but this can be extended to load from files
-  }
-
-  async generate(options: GeneratorOptions): Promise<string[]> {
-    const createdFiles: string[] = [];
-    const templateContext = {
-      projectType: options.projectType,
-      timestamp: new Date().toISOString(),
-    };
-
-    // Define files to generate based on project type
-    const files = this.getFilesForProjectType(options.projectType);
-
-    for (const file of files) {
-      const outputPath = path.join(options.outputDir, file.outputPath);
-      
-      if (options.dryRun) {
-        createdFiles.push(outputPath);
-        continue;
-      }
-
-      // Ensure directory exists
-      await fs.ensureDir(path.dirname(outputPath));
-
-      // Generate content
-      const content = await this.renderTemplate(file.template, templateContext);
-      
-      // Write file
-      await fs.writeFile(outputPath, content, 'utf-8');
-      createdFiles.push(outputPath);
-    }
-
-    return createdFiles;
+    this.handlebars = Handlebars.create();
+    this.registerHelpers();
   }
 
   /**
-   * Get the list of files that would be generated for a project type.
-   * Exposed for use by other modules (e.g., init command) to check for existing files.
+   * Register custom Handlebars helpers for template rendering
    */
-  public getFilesForProjectType(projectType: string): Array<{ template: string; outputPath: string }> {
-    const baseFiles = [
-      { template: 'custom.yaml.hbs', outputPath: 'custom.yaml' },
-      { template: 'agents.yaml.hbs', outputPath: 'agents.yaml' },
-      { template: 'phases.yaml.hbs', outputPath: 'phases.yaml' },
-      { template: 'workflows.yaml.hbs', outputPath: 'workflows.yaml' },
-      { template: 'README.md.hbs', outputPath: 'README.md' },
+  private registerHelpers(): void {
+    // Helper to check if a value is truthy
+    this.handlebars.registerHelper('isTruthy', function (value: unknown): boolean {
+      return Boolean(value);
+    });
+
+    // Helper to convert a value to YAML-friendly string
+    this.handlebars.registerHelper('toYaml', function (value: unknown): string {
+      if (typeof value === 'string') {
+        return value;
+      }
+      if (typeof value === 'boolean') {
+        return value ? 'true' : 'false';
+      }
+      if (typeof value === 'number') {
+        return String(value);
+      }
+      if (Array.isArray(value)) {
+        return value.join(', ');
+      }
+      return JSON.stringify(value);
+    });
+
+    // Helper for equality comparison
+    this.handlebars.registerHelper('eq', function (a: unknown, b: unknown): boolean {
+      return a === b;
+    });
+
+    // Helper for inequality comparison
+    this.handlebars.registerHelper('neq', function (a: unknown, b: unknown): boolean {
+      return a !== b;
+    });
+
+    // Helper for 'or' operation
+    this.handlebars.registerHelper('or', function (...args: unknown[]): boolean {
+      const values = args.slice(0, -1);
+      return values.some(Boolean);
+    });
+
+    // Helper for 'and' operation
+    this.handlebars.registerHelper('and', function (...args: unknown[]): boolean {
+      const values = args.slice(0, -1);
+      return values.every(Boolean);
+    });
+
+    // Helper to join array elements
+    this.handlebars.registerHelper('join', function (array: string[], separator = ', '): string {
+      if (!Array.isArray(array)) return '';
+      return array.join(separator);
+    });
+
+    // Helper to format timestamp
+    this.handlebars.registerHelper('formatDate', function (timestamp: string): string {
+      try {
+        return new Date(timestamp).toISOString();
+      } catch {
+        return timestamp;
+      }
+    });
+  }
+
+  /**
+   * Build the template context from generator options
+   */
+  private buildContext(options: GeneratorOptions): TemplateContext {
+    return {
+      projectType: options.projectType,
+      projectName: options.projectName,
+      timestamp: new Date().toISOString(),
+      agents: options.agents,
+      phases: options.phases,
+      workflows: options.workflows,
+      schedules: options.schedules,
+      custom: options.custom,
+      tools: options.tools,
+    };
+  }
+
+  /**
+   * Load a template file from the templates directory
+   */
+  private loadTemplate(templateName: string): string {
+    const templatePath = path.join(TEMPLATES_DIR, templateName);
+    
+    if (!fs.existsSync(templatePath)) {
+      throw new Error(`Template not found: ${templateName}`);
+    }
+
+    return fs.readFileSync(templatePath, 'utf-8');
+  }
+
+  /**
+   * Render a template with the given context
+   */
+  private renderTemplate(templateContent: string, context: TemplateContext): string {
+    const compiled = this.handlebars.compile(templateContent);
+    return compiled(context);
+  }
+
+  /**
+   * Get the list of files that would be generated for a project type
+   */
+  public getFilesForProjectType(projectType: string): TemplateFile[] {
+    const baseFiles: TemplateFile[] = [
+      { template: 'custom.yaml.hbs', outputPath: 'custom.yaml', description: 'Custom AO configuration' },
+      { template: 'agents.yaml.hbs', outputPath: 'agents.yaml', description: 'Agent definitions' },
+      { template: 'phases.yaml.hbs', outputPath: 'phases.yaml', description: 'Phase definitions' },
+      { template: 'workflows.yaml.hbs', outputPath: 'workflows.yaml', description: 'Workflow definitions' },
     ];
 
     // Add project-type specific files
@@ -63,783 +146,124 @@ export class TemplateGenerator {
       case 'typescript-monorepo':
         return [
           ...baseFiles,
-          { template: 'monorepo-agents.yaml.hbs', outputPath: 'agents-monorepo.yaml' },
-          { template: 'monorepo-phases.yaml.hbs', outputPath: 'phases-monorepo.yaml' },
+          { template: 'monorepo-agents.yaml.hbs', outputPath: 'agents-monorepo.yaml', description: 'Monorepo agents' },
+          { template: 'monorepo-phases.yaml.hbs', outputPath: 'phases-monorepo.yaml', description: 'Monorepo phases' },
         ];
       case 'nextjs':
         return [
           ...baseFiles,
-          { template: 'nextjs-agents.yaml.hbs', outputPath: 'agents-nextjs.yaml' },
-          { template: 'nextjs-phases.yaml.hbs', outputPath: 'phases-nextjs.yaml' },
+          { template: 'nextjs-agents.yaml.hbs', outputPath: 'agents-nextjs.yaml', description: 'Next.js agents' },
+          { template: 'nextjs-phases.yaml.hbs', outputPath: 'phases-nextjs.yaml', description: 'Next.js phases' },
         ];
       case 'rust':
         return [
           ...baseFiles,
-          { template: 'rust-agents.yaml.hbs', outputPath: 'agents-rust.yaml' },
-          { template: 'rust-phases.yaml.hbs', outputPath: 'phases-rust.yaml' },
+          { template: 'rust-agents.yaml.hbs', outputPath: 'agents-rust.yaml', description: 'Rust agents' },
+          { template: 'rust-phases.yaml.hbs', outputPath: 'phases-rust.yaml', description: 'Rust phases' },
         ];
       case 'python':
         return [
           ...baseFiles,
-          { template: 'python-agents.yaml.hbs', outputPath: 'agents-python.yaml' },
-          { template: 'python-phases.yaml.hbs', outputPath: 'phases-python.yaml' },
+          { template: 'python-agents.yaml.hbs', outputPath: 'agents-python.yaml', description: 'Python agents' },
+          { template: 'python-phases.yaml.hbs', outputPath: 'phases-python.yaml', description: 'Python phases' },
         ];
       default:
         return baseFiles;
     }
   }
 
-  private async renderTemplate(templateName: string, context: Record<string, unknown>): Promise<string> {
-    const templates: Record<string, string> = {
-      // Base templates
-      'custom.yaml.hbs': this.getCustomYamlTemplate(),
-      'agents.yaml.hbs': this.getAgentsYamlTemplate(),
-      'phases.yaml.hbs': this.getPhasesYamlTemplate(),
-      'workflows.yaml.hbs': this.getWorkflowsYamlTemplate(),
-      'README.md.hbs': this.getReadmeTemplate(),
-      // TypeScript monorepo templates
-      'monorepo-agents.yaml.hbs': this.getMonorepoAgentsTemplate(),
-      'monorepo-phases.yaml.hbs': this.getMonorepoPhasesTemplate(),
-      // Next.js templates
-      'nextjs-agents.yaml.hbs': this.getNextjsAgentsTemplate(),
-      'nextjs-phases.yaml.hbs': this.getNextjsPhasesTemplate(),
-      // Rust templates
-      'rust-agents.yaml.hbs': this.getRustAgentsTemplate(),
-      'rust-phases.yaml.hbs': this.getRustPhasesTemplate(),
-      // Python templates
-      'python-agents.yaml.hbs': this.getPythonAgentsTemplate(),
-      'python-phases.yaml.hbs': this.getPythonPhasesTemplate(),
-    };
+  /**
+   * Generate AO configuration files from templates
+   */
+  async generate(options: GeneratorOptions): Promise<string[]> {
+    const createdFiles: string[] = [];
+    const context = this.buildContext(options);
 
-    const template = templates[templateName];
-    if (!template) {
-      throw new Error(`Template not found: ${templateName}`);
+    // Get files to generate based on project type
+    const files = this.getFilesForProjectType(options.projectType);
+
+    for (const file of files) {
+      const outputPath = path.join(options.outputDir, file.outputPath);
+
+      if (options.dryRun) {
+        createdFiles.push(outputPath);
+        continue;
+      }
+
+      try {
+        // Ensure directory exists
+        await fs.ensureDir(path.dirname(outputPath));
+
+        // Load and render template
+        const templateContent = this.loadTemplate(file.template);
+        const content = this.renderTemplate(templateContent, context);
+
+        // Write file
+        await fs.writeFile(outputPath, content, 'utf-8');
+        createdFiles.push(outputPath);
+      } catch (error) {
+        // If template doesn't exist, skip it (for optional templates)
+        if ((error as Error).message.includes('Template not found')) {
+          continue;
+        }
+        throw error;
+      }
     }
 
-    const compiled = Handlebars.compile(template);
-    return compiled(context);
+    return createdFiles;
   }
 
-  private getCustomYamlTemplate(): string {
-    return `# AO Custom Configuration
-# Generated by ao-starter
-# Project Type: {{projectType}}
-# Generated: {{timestamp}}
+  /**
+   * Generate a specific template with custom context
+   */
+  async generateWithContext(
+    templateName: string,
+    outputPath: string,
+    context: TemplateContext,
+    dryRun = false
+  ): Promise<string[]> {
+    const createdFiles: string[] = [];
 
-# Custom settings for your project
-custom:
-  project_type: {{projectType}}
-  
-  # Scheduling configuration
-  scheduling:
-    # Run daemon every 30 seconds
-    interval_secs: 30
-    
-    # Auto-run ready tasks
-    auto_run_ready: true
-    
-    # Auto-merge completed PRs
-    auto_merge: false
-    
-    # Auto-create PRs for completed work
-    auto_pr: true
-`;
+    if (dryRun) {
+      createdFiles.push(outputPath);
+      return createdFiles;
+    }
+
+    // Ensure directory exists
+    await fs.ensureDir(path.dirname(outputPath));
+
+    // Load and render template
+    const templateContent = this.loadTemplate(templateName);
+    const content = this.renderTemplate(templateContent, context);
+
+    // Write file
+    await fs.writeFile(outputPath, content, 'utf-8');
+    createdFiles.push(outputPath);
+
+    return createdFiles;
   }
 
-  private getAgentsYamlTemplate(): string {
-    return `# AO Agents Configuration
-# Generated by ao-starter
-# Project Type: {{projectType}}
-# Generated: {{timestamp}}
+  /**
+   * Generate all AO configuration files and return detailed result
+   */
+  async generateComplete(options: GeneratorOptions): Promise<GenerationResult> {
+    const files = await this.generate(options);
+    const context = this.buildContext(options);
 
-agents:
-  # Primary implementation agent
-  developer:
-    role: Senior Software Engineer
-    model: claude-3-opus
-    capabilities:
-      - code-implementation
-      - refactoring
-      - debugging
-      - testing
-    max_concurrent: 1
-    
-  # Code review agent
-  reviewer:
-    role: Code Reviewer
-    model: claude-3-sonnet
-    capabilities:
-      - code-review
-      - security-analysis
-      - performance-review
-    max_concurrent: 2
-    
-  # Documentation agent
-  documenter:
-    role: Technical Writer
-    model: claude-3-sonnet
-    capabilities:
-      - documentation
-      - readme-generation
-      - api-docs
-    max_concurrent: 1
-    
-  # QA agent
-  tester:
-    role: QA Engineer
-    model: claude-3-sonnet
-    capabilities:
-      - test-writing
-      - test-execution
-      - e2e-testing
-    max_concurrent: 1
-`;
+    return {
+      files,
+      context,
+    };
   }
 
-  private getPhasesYamlTemplate(): string {
-    return `# AO Phases Configuration
-# Generated by ao-starter
-# Project Type: {{projectType}}
-# Generated: {{timestamp}}
-
-phases:
-  # Planning phase
-  planning:
-    agent: developer
-    description: Analyze requirements and create implementation plan
-    timeout_secs: 300
-    outputs:
-      - plan
-      - design_decisions
-      
-  # Implementation phase
-  implementation:
-    agent: developer
-    description: Implement the planned changes
-    timeout_secs: 1800
-    outputs:
-      - code_changes
-      - test_results
-    depends_on:
-      - planning
-      
-  # Code review phase
-  review:
-    agent: reviewer
-    description: Review implemented code for quality and security
-    timeout_secs: 600
-    outputs:
-      - review_comments
-      - approval_status
-    depends_on:
-      - implementation
-      
-  # Testing phase
-  testing:
-    agent: tester
-    description: Run tests and verify functionality
-    timeout_secs: 600
-    outputs:
-      - test_results
-      - coverage_report
-    depends_on:
-      - implementation
-      
-  # Documentation phase
-  documentation:
-    agent: documenter
-    description: Update documentation for changes
-    timeout_secs: 300
-    outputs:
-      - updated_docs
-    depends_on:
-      - implementation
-`;
-  }
-
-  private getWorkflowsYamlTemplate(): string {
-    return `# AO Workflows Configuration
-# Generated by ao-starter
-# Project Type: {{projectType}}
-# Generated: {{timestamp}}
-
-workflows:
-  # Standard development workflow
-  standard:
-    description: Standard workflow for feature development
-    phases:
-      - planning
-      - implementation
-      - review
-      - testing
-      - documentation
-    default: true
-    
-  # Quick fix workflow
-  quickfix:
-    description: Simplified workflow for bug fixes
-    phases:
-      - implementation
-      - testing
-      
-  # Feature workflow with extended review
-  feature:
-    description: Extended workflow for new features
-    phases:
-      - planning
-      - implementation
-      - review
-      - testing
-      - documentation
-      
-  # Documentation-only workflow
-  docs:
-    description: Workflow for documentation updates
-    phases:
-      - documentation
-`;
-  }
-
-  private getReadmeTemplate(): string {
-    return `# AO Workflows
-
-This directory contains AO (Agent Orchestrator) workflow configurations for this project.
-
-## Generated by ao-starter
-
-- **Project Type:** {{projectType}}
-- **Generated:** {{timestamp}}
-
-## Files
-
-- \`custom.yaml\` - Custom configuration settings
-- \`agents.yaml\` - Agent definitions and capabilities
-- \`phases.yaml\` - Phase definitions for workflows
-- \`workflows.yaml\` - Workflow compositions
-
-## Getting Started
-
-1. Review and customize the generated configuration files
-2. Start the AO daemon:
-   \`\`\`bash
-   ao daemon start
-   \`\`\`
-3. View available tasks:
-   \`\`\`bash
-   ao task list
-   \`\`\`
-4. Create a new task:
-   \`\`\`bash
-   ao task create "Your task description"
-   \`\`\`
-
-## Resources
-
-- [AO Documentation](https://github.com/launchapp-dev/ao-docs)
-- [AO CLI](https://github.com/launchapp-dev/ao)
-- [AO Skills](https://github.com/launchapp-dev/ao-skills)
-`;
-  }
-
-  // TypeScript Monorepo Templates
-
-  private getMonorepoAgentsTemplate(): string {
-    return `# AO Monorepo Agents Configuration
-# Generated by ao-starter for TypeScript monorepo projects
-# Generated: {{timestamp}}
-
-agents:
-  # Package developer agent
-  package-developer:
-    role: Package Developer
-    model: claude-3-opus
-    capabilities:
-      - code-implementation
-      - package-development
-      - cross-package-dependencies
-    max_concurrent: 1
-
-  # App developer agent
-  app-developer:
-    role: Application Developer
-    model: claude-3-opus
-    capabilities:
-      - app-development
-      - fullstack-implementation
-      - ui-development
-    max_concurrent: 1
-
-  # Shared library maintainer
-  lib-maintainer:
-    role: Library Maintainer
-    model: claude-3-sonnet
-    capabilities:
-      - library-development
-      - api-design
-      - backwards-compatibility
-    max_concurrent: 1
-
-  # Build system agent
-  build-engineer:
-    role: Build Engineer
-    model: claude-3-sonnet
-    capabilities:
-      - build-optimization
-      - dependency-management
-      - workspace-maintenance
-    max_concurrent: 1
-`;
-  }
-
-  private getMonorepoPhasesTemplate(): string {
-    return `# AO Monorepo Phases Configuration
-# Generated by ao-starter for TypeScript monorepo projects
-# Generated: {{timestamp}}
-
-phases:
-  # Workspace analysis
-  workspace-analysis:
-    agent: build-engineer
-    description: Analyze workspace structure and dependencies
-    timeout_secs: 300
-    outputs:
-      - dependency-graph
-      - affected-packages
-      - build-order
-
-  # Cross-package planning
-  cross-package-planning:
-    agent: package-developer
-    description: Plan cross-package changes and coordination
-    timeout_secs: 600
-    outputs:
-      - coordination-plan
-      - dependency-updates
-    depends_on:
-      - workspace-analysis
-
-  # Library implementation
-  library-implementation:
-    agent: lib-maintainer
-    description: Implement shared library changes
-    timeout_secs: 1800
-    outputs:
-      - library-changes
-      - api-updates
-      - tests
-    depends_on:
-      - cross-package-planning
-
-  # Package implementation
-  package-implementation:
-    agent: package-developer
-    description: Implement application and package changes
-    timeout_secs: 1800
-    outputs:
-      - package-changes
-      - integration-tests
-    depends_on:
-      - library-implementation
-
-  # Workspace-wide tests
-  workspace-testing:
-    agent: package-developer
-    description: Run tests across affected packages
-    timeout_secs: 900
-    outputs:
-      - test-results
-      - coverage-report
-      - affected-packages
-    depends_on:
-      - package-implementation
-
-  # Build verification
-  build-verification:
-    agent: build-engineer
-    description: Verify build and distribution
-    timeout_secs: 600
-    outputs:
-      - build-artifacts
-      - distribution-check
-    depends_on:
-      - workspace-testing
-`;
-  }
-
-  // Next.js Templates
-
-  private getNextjsAgentsTemplate(): string {
-    return `# AO Next.js Agents Configuration
-# Generated by ao-starter for Next.js projects
-# Generated: {{timestamp}}
-
-agents:
-  # Full-stack developer
-  fullstack-developer:
-    role: Full-Stack Developer
-    model: claude-3-opus
-    capabilities:
-      - react-development
-      - nextjs-app-router
-      - api-routes
-      - server-components
-    max_concurrent: 1
-
-  # UI specialist
-  ui-specialist:
-    role: UI Specialist
-    model: claude-3-sonnet
-    capabilities:
-      - component-development
-      - styling
-      - animation
-      - accessibility
-    max_concurrent: 1
-
-  # API developer
-  api-developer:
-    role: API Developer
-    model: claude-3-sonnet
-    capabilities:
-      - rest-apis
-      - graphql
-      - database-design
-      - authentication
-    max_concurrent: 1
-
-  # Performance engineer
-  perf-engineer:
-    role: Performance Engineer
-    model: claude-3-sonnet
-    capabilities:
-      - core-web-vitals
-      - bundle-optimization
-      - caching-strategies
-    max_concurrent: 1
-`;
-  }
-
-  private getNextjsPhasesTemplate(): string {
-    return `# AO Next.js Phases Configuration
-# Generated by ao-starter for Next.js projects
-# Generated: {{timestamp}}
-
-phases:
-  # Page/component planning
-  page-planning:
-    agent: fullstack-developer
-    description: Plan page structure and component architecture
-    timeout_secs: 300
-    outputs:
-      - component-tree
-      - data-requirements
-      - api-design
-
-  # UI implementation
-  ui-implementation:
-    agent: ui-specialist
-    description: Implement UI components and pages
-    timeout_secs: 1800
-    outputs:
-      - components
-      - pages
-      - styles
-    depends_on:
-      - page-planning
-
-  # API implementation
-  api-implementation:
-    agent: api-developer
-    description: Implement API routes and data layer
-    timeout_secs: 1800
-    outputs:
-      - api-routes
-      - database-schema
-      - data-fetching
-    depends_on:
-      - page-planning
-
-  # Integration
-  integration:
-    agent: fullstack-developer
-    description: Connect UI with backend APIs
-    timeout_secs: 900
-    outputs:
-      - integrated-pages
-      - data-flow
-    depends_on:
-      - ui-implementation
-      - api-implementation
-
-  # E2E testing
-  e2e-testing:
-    agent: fullstack-developer
-    description: Write and run end-to-end tests
-    timeout_secs: 900
-    outputs:
-      - e2e-tests
-      - test-results
-    depends_on:
-      - integration
-
-  # Performance optimization
-  performance-optimization:
-    agent: perf-engineer
-    description: Optimize for Core Web Vitals
-    timeout_secs: 600
-    outputs:
-      - performance-report
-      - optimizations
-    depends_on:
-      - e2e-testing
-`;
-  }
-
-  // Rust Templates
-
-  private getRustAgentsTemplate(): string {
-    return `# AO Rust Agents Configuration
-# Generated by ao-starter for Rust projects
-# Generated: {{timestamp}}
-
-agents:
-  # Rust systems developer
-  rust-developer:
-    role: Rust Systems Developer
-    model: claude-3-opus
-    capabilities:
-      - systems-programming
-      - memory-safety
-      - concurrency
-      - cargo-workspace
-    max_concurrent: 1
-
-  # Crate maintainer
-  crate-maintainer:
-    role: Crate Maintainer
-    model: claude-3-sonnet
-    capabilities:
-      - api-design
-      - documentation
-      - versioning
-    max_concurrent: 1
-
-  # Performance engineer
-  perf-engineer:
-    role: Systems Performance Engineer
-    model: claude-3-sonnet
-    capabilities:
-      - profiling
-      - optimization
-      - benchmarking
-    max_concurrent: 1
-`;
-  }
-
-  private getRustPhasesTemplate(): string {
-    return `# AO Rust Phases Configuration
-# Generated by ao-starter for Rust projects
-# Generated: {{timestamp}}
-
-phases:
-  # Crate design
-  crate-design:
-    agent: crate-maintainer
-    description: Design crate API and module structure
-    timeout_secs: 300
-    outputs:
-      - module-structure
-      - api-design
-      - public-api
-
-  # Implementation
-  implementation:
-    agent: rust-developer
-    description: Implement Rust code
-    timeout_secs: 1800
-    outputs:
-      - implementation
-      - unit-tests
-      - documentation
-    depends_on:
-      - crate-design
-
-  # Clippy check
-  clippy-check:
-    agent: rust-developer
-    description: Run clippy lints and fix warnings
-    timeout_secs: 600
-    outputs:
-      - clippy-results
-      - lint-fixes
-    depends_on:
-      - implementation
-
-  # Formatting
-  formatting:
-    agent: rust-developer
-    description: Run cargo fmt and ensure code style
-    timeout_secs: 300
-    outputs:
-      - formatted-code
-    depends_on:
-      - implementation
-
-  # Documentation
-  documentation:
-    agent: crate-maintainer
-    description: Generate and verify documentation
-    timeout_secs: 600
-    outputs:
-      - docs
-      - doc-tests
-    depends_on:
-      - implementation
-
-  # Benchmarking
-  benchmarking:
-    agent: perf-engineer
-    description: Run benchmarks and verify performance
-    timeout_secs: 900
-    outputs:
-      - benchmark-results
-      - performance-report
-    depends_on:
-      - implementation
-
-  # Integration tests
-  integration-tests:
-    agent: rust-developer
-    description: Run integration tests
-    timeout_secs: 900
-    outputs:
-      - integration-test-results
-    depends_on:
-      - implementation
-`;
-  }
-
-  // Python Templates
-
-  private getPythonAgentsTemplate(): string {
-    return `# AO Python Agents Configuration
-# Generated by ao-starter for Python projects
-# Generated: {{timestamp}}
-
-agents:
-  # Python backend developer
-  python-developer:
-    role: Python Backend Developer
-    model: claude-3-opus
-    capabilities:
-      - python-development
-      - api-development
-      - data-processing
-    max_concurrent: 1
-
-  # Data scientist
-  data-scientist:
-    role: Data Scientist
-    model: claude-3-sonnet
-    capabilities:
-      - data-analysis
-      - machine-learning
-      - visualization
-    max_concurrent: 1
-
-  # DevOps engineer
-  devops-engineer:
-    role: DevOps Engineer
-    model: claude-3-sonnet
-    capabilities:
-      - deployment
-      - testing
-      - ci-cd
-    max_concurrent: 1
-`;
-  }
-
-  private getPythonPhasesTemplate(): string {
-    return `# AO Python Phases Configuration
-# Generated by ao-starter for Python projects
-# Generated: {{timestamp}}
-
-phases:
-  # Environment setup
-  env-setup:
-    agent: devops-engineer
-    description: Set up Python environment and dependencies
-    timeout_secs: 300
-    outputs:
-      - requirements
-      - virtual-env
-      - setup-configuration
-
-  # Code implementation
-  implementation:
-    agent: python-developer
-    description: Implement Python code
-    timeout_secs: 1800
-    outputs:
-      - python-code
-      - unit-tests
-    depends_on:
-      - env-setup
-
-  # Type checking
-  type-checking:
-    agent: python-developer
-    description: Run mypy type checking
-    timeout_secs: 600
-    outputs:
-      - type-check-results
-    depends_on:
-      - implementation
-
-  # Linting
-  linting:
-    agent: python-developer
-    description: Run linting and formatting
-    timeout_secs: 300
-    outputs:
-      - lint-results
-      - formatted-code
-    depends_on:
-      - implementation
-
-  # Testing
-  testing:
-    agent: devops-engineer
-    description: Run pytest and generate coverage
-    timeout_secs: 900
-    outputs:
-      - test-results
-      - coverage-report
-    depends_on:
-      - implementation
-
-  # Documentation
-  documentation:
-    agent: python-developer
-    description: Generate API documentation
-    timeout_secs: 600
-    outputs:
-      - api-docs
-      - docstrings
-    depends_on:
-      - implementation
-
-  # ML/Data phases (if applicable)
-  ml-processing:
-    agent: data-scientist
-    description: Process data and train models
-    timeout_secs: 1800
-    outputs:
-      - models
-      - processed-data
-      - metrics
-    depends_on:
-      - implementation
-`;
+  /**
+   * Preview what a template would render without writing files
+   */
+  previewTemplate(templateName: string, context: TemplateContext): string {
+    const templateContent = this.loadTemplate(templateName);
+    return this.renderTemplate(templateContent, context);
   }
 }
+
+// Export a default instance for convenience
+export const templateGenerator = new TemplateGenerator();
