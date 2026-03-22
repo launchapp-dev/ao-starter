@@ -167,6 +167,30 @@ export class TemplateGenerator {
           { template: 'python-agents.yaml.hbs', outputPath: 'agents-python.yaml', description: 'Python agents' },
           { template: 'python-phases.yaml.hbs', outputPath: 'phases-python.yaml', description: 'Python phases' },
         ];
+      case 'go':
+        return [
+          ...baseFiles,
+          { template: 'go-agents.yaml.hbs', outputPath: 'agents-go.yaml', description: 'Go agents' },
+          { template: 'go-phases.yaml.hbs', outputPath: 'phases-go.yaml', description: 'Go phases' },
+        ];
+      case 'elixir':
+        return [
+          ...baseFiles,
+          { template: 'elixir-agents.yaml.hbs', outputPath: 'agents-elixir.yaml', description: 'Elixir agents' },
+          { template: 'elixir-phases.yaml.hbs', outputPath: 'phases-elixir.yaml', description: 'Elixir phases' },
+        ];
+      case 'bun':
+        return [
+          ...baseFiles,
+          { template: 'bun-agents.yaml.hbs', outputPath: 'agents-bun.yaml', description: 'Bun agents' },
+          { template: 'bun-phases.yaml.hbs', outputPath: 'phases-bun.yaml', description: 'Bun phases' },
+        ];
+      case 'deno':
+        return [
+          ...baseFiles,
+          { template: 'deno-agents.yaml.hbs', outputPath: 'agents-deno.yaml', description: 'Deno agents' },
+          { template: 'deno-phases.yaml.hbs', outputPath: 'phases-deno.yaml', description: 'Deno phases' },
+        ];
       default:
         return baseFiles;
     }
