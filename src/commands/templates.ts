@@ -76,6 +76,34 @@ const AVAILABLE_TEMPLATES: TemplateInfo[] = [
     suitableFor: ['Python projects', 'ML/data projects', 'API backends'],
     isDefault: false,
   },
+  {
+    id: 'bun',
+    name: 'Bun',
+    description: 'Bun-optimized workflows for fast JavaScript/TypeScript execution',
+    suitableFor: ['Bun projects', 'Fast scripts', 'API servers'],
+    isDefault: false,
+  },
+  {
+    id: 'deno',
+    name: 'Deno',
+    description: 'Deno workflows with built-in TypeScript and secure defaults',
+    suitableFor: ['Deno projects', 'Secure scripts', 'Serverless functions'],
+    isDefault: false,
+  },
+  {
+    id: 'elixir',
+    name: 'Elixir',
+    description: 'Elixir/Phoenix workflows with mix, ExUnit, and Dialyzer support',
+    suitableFor: ['Elixir projects', 'Phoenix applications', 'Distributed systems'],
+    isDefault: false,
+  },
+  {
+    id: 'go',
+    name: 'Go',
+    description: 'Go workflows with go vet, golint, and benchmarking',
+    suitableFor: ['Go projects', 'CLI tools', 'Network services'],
+    isDefault: false,
+  },
 ];
 
 /**
