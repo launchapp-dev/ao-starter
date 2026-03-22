@@ -40,10 +40,6 @@ export class ProjectDetector {
       this.detectRustWorkspace.bind(this),
       this.detectRustSingle.bind(this),
       this.detectPython.bind(this),
-      this.detectBun.bind(this),
-      this.detectDeno.bind(this),
-      this.detectGo.bind(this),
-      this.detectElixir.bind(this),
       this.detectTypeScript.bind(this),
       this.detectJavaScript.bind(this),
     ];
@@ -87,7 +83,6 @@ export class ProjectDetector {
   private createUnknownMetadata(): ProjectMetadata {
     return {
       type: 'unknown',
-      confidence: 0,
       language: 'Unknown',
       monorepo: false,
       packages: [],
@@ -102,7 +97,6 @@ export class ProjectDetector {
   private createMetadata(result: DetectorResult): ProjectMetadata {
     return {
       type: result.type,
-      confidence: result.confidence,
       framework: result.framework,
       language: this.getLanguageForType(result.type),
       monorepo: result.type === 'typescript-monorepo' || result.type === 'rust-workspace',
@@ -302,125 +296,6 @@ export class ProjectDetector {
   }
 
   /**
-   * Detect Bun project: bun.lockb or bunfig.toml
-   */
-  private async detectBun(): Promise<DetectorResult | null> {
-    const bunLockb = await this.fileExists('bun.lockb');
-    const bunfig = await this.fileExists('bunfig.toml');
-
-    if (!bunLockb && !bunfig) {
-      return null;
-    }
-
-    const packageJson = await this.fileExists('package.json');
-
-    const indicators: string[] = [];
-    if (bunLockb) indicators.push('bun.lockb');
-    if (bunfig) indicators.push('bunfig.toml');
-
-    return {
-      type: 'bun',
-      confidence: packageJson ? 80 : 70,
-      framework: 'Bun',
-      buildTool: 'bun',
-      indicators,
-    };
-  }
-
-  /**
-   * Detect Deno project: deno.json or deno.jsonc
-   */
-  private async detectDeno(): Promise<DetectorResult | null> {
-    const denoJson = await this.fileExists('deno.json');
-    const denoJsonc = await this.fileExists('deno.jsonc');
-
-    if (!denoJson && !denoJsonc) {
-      return null;
-    }
-
-    const configFile = denoJson ? 'deno.json' : 'deno.jsonc';
-    let rootPackage: string | undefined;
-
-    try {
-      const content = await this.readFile(configFile);
-      if (content) {
-        const config = JSON.parse(content);
-        rootPackage = config?.name;
-      }
-    } catch {
-      // Config may have comments, ignore parse errors
-    }
-
-    const indicators: string[] = [configFile];
-
-    return {
-      type: 'deno',
-      confidence: 90,
-      framework: 'Deno',
-      rootPackage,
-      buildTool: 'deno',
-      indicators,
-    };
-  }
-
-  /**
-   * Detect Go project: go.mod
-   */
-  private async detectGo(): Promise<DetectorResult | null> {
-    const goMod = await this.fileExists('go.mod');
-    if (!goMod) {
-      return null;
-    }
-
-    let rootPackage: string | undefined;
-    const goModContent = await this.readFile('go.mod');
-    if (goModContent) {
-      const match = goModContent.match(/^module\s+([^\s]+)/m);
-      if (match) {
-        rootPackage = match[1];
-      }
-    }
-
-    return {
-      type: 'go',
-      confidence: 95,
-      framework: 'Go',
-      rootPackage,
-      buildTool: 'go',
-      indicators: ['go.mod'],
-    };
-  }
-
-  /**
-   * Detect Elixir project: mix.exs
-   */
-  private async detectElixir(): Promise<DetectorResult | null> {
-    const mixExs = await this.fileExists('mix.exs');
-    if (!mixExs) {
-      return null;
-    }
-
-    let rootPackage: string | undefined;
-    const mixContent = await this.readFile('mix.exs');
-    if (mixContent) {
-      // Extract project name from mix.exs: def project do [app: :app_name, ...]
-      const match = mixContent.match(/app:\s*:([a-zA-Z_][a-zA-Z0-9_]*)/);
-      if (match) {
-        rootPackage = match[1];
-      }
-    }
-
-    return {
-      type: 'elixir',
-      confidence: 90,
-      framework: 'Elixir',
-      rootPackage,
-      buildTool: 'mix',
-      indicators: ['mix.exs'],
-    };
-  }
-
-  /**
    * Detect standard TypeScript: package.json + tsconfig.json (without monorepo indicators)
    */
   private async detectTypeScript(): Promise<DetectorResult | null> {
@@ -560,10 +435,6 @@ export class ProjectDetector {
       'rust': 'Rust',
       'rust-workspace': 'Rust',
       'python': 'Python',
-      'bun': 'JavaScript',
-      'deno': 'JavaScript',
-      'go': 'Go',
-      'elixir': 'Elixir',
       'unknown': 'Unknown',
     };
 
@@ -599,22 +470,6 @@ export class ProjectDetector {
       'javascript': [
         'Run: ao init to generate JavaScript workflows',
         'Consider adding ESLint and Prettier phases',
-      ],
-      'bun': [
-        'Run: ao init to generate Bun optimized workflows',
-        'Consider adding bun test and type-check phases',
-      ],
-      'deno': [
-        'Run: ao init to generate Deno optimized workflows',
-        'Consider adding deno lint and fmt phases',
-      ],
-      'go': [
-        'Run: ao init to generate Go optimized workflows',
-        'Consider adding go vet and golint phases',
-      ],
-      'elixir': [
-        'Run: ao init to generate Elixir optimized workflows',
-        'Consider adding mix test and credo phases',
       ],
       'unknown': [],
     };

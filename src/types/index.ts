@@ -13,10 +13,6 @@ export type ProjectType =
   | 'rust'
   | 'rust-workspace'
   | 'python'
-  | 'bun'
-  | 'deno'
-  | 'go'
-  | 'elixir'
   | 'unknown';
 
 /**
@@ -32,16 +28,12 @@ export type Framework =
   | 'Python'
   | 'Poetry'
   | 'Pipenv'
-  | 'Bun'
-  | 'Deno'
-  | 'Go'
-  | 'Elixir'
   | undefined;
 
 /**
  * Programming language detected
  */
-export type Language = 'TypeScript' | 'JavaScript' | 'Rust' | 'Python' | 'Go' | 'Elixir' | 'Unknown';
+export type Language = 'TypeScript' | 'JavaScript' | 'Rust' | 'Python' | 'Unknown';
 
 /**
  * Detection result from project analysis
@@ -97,8 +89,6 @@ export interface InitOptions {
 export interface ProjectMetadata {
   /** Detected project type */
   type: ProjectType;
-  /** Confidence score (0-100) */
-  confidence: number;
   /** Framework name if detected */
   framework?: Framework;
   /** Programming language */
