@@ -17,6 +17,7 @@ const VERSION = '0.1.0';
 const COMMANDS = {
   INIT: 'init',
   DETECT: 'detect',
+  TEMPLATES: 'templates',
 } as const;
 
 /**
@@ -38,6 +39,7 @@ Examples:
   $ ao init                  Initialize AO workflows for current project
   $ ao init --template nextjs  Initialize with Next.js template
   $ ao init --list           List available templates
+  $ ao templates             List all available templates
   $ ao detect                Detect project type
 
 For more information, see https://github.com/launchapp-dev/ao-starter`
@@ -80,6 +82,12 @@ For more information, see https://github.com/launchapp-dev/ao-starter`
     .description('Detect project type and show recommendations')
     .option('--json', 'Output in JSON format')
     .action(detectCommand);
+
+  // Register templates command
+  prog
+    .command(COMMANDS.TEMPLATES)
+    .description('List all available templates with their descriptions')
+    .action(listTemplates);
 
   return prog;
 }
