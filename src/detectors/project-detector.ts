@@ -87,6 +87,7 @@ export class ProjectDetector {
   private createUnknownMetadata(): ProjectMetadata {
     return {
       type: 'unknown',
+      confidence: 0,
       language: 'Unknown',
       monorepo: false,
       packages: [],
@@ -101,6 +102,7 @@ export class ProjectDetector {
   private createMetadata(result: DetectorResult): ProjectMetadata {
     return {
       type: result.type,
+      confidence: result.confidence,
       framework: result.framework,
       language: this.getLanguageForType(result.type),
       monorepo: result.type === 'typescript-monorepo' || result.type === 'rust-workspace',
