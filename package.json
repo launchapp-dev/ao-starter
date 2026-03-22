@@ -34,7 +34,8 @@
     "commander": "^12.0.0",
     "fs-extra": "^11.2.0",
     "glob": "^10.3.10",
-    "handlebars": "^4.7.8"
+    "handlebars": "^4.7.8",
+    "picocolors": "^1.0.0"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
