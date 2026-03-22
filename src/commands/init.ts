@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { ProjectDetector } from '../detectors/project-detector.js';
 import { TemplateGenerator } from '../templates/template-generator.js';
+import type { ErrnoException } from '../types/index.js';
 
 export interface InitOptions {
   template?: string;
@@ -15,9 +16,12 @@ export interface InitOptions {
  * Custom error class for init command errors
  */
 export class InitError extends Error {
-  constructor(message: string, public readonly code: 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR') {
+  public readonly code: 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR';
+
+  constructor(message: string, code: 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR') {
     super(message);
     this.name = 'InitError';
+    this.code = code;
   }
 }
 
@@ -40,7 +44,7 @@ async function checkWritePermission(dirPath: string): Promise<void> {
     if (error instanceof InitError) {
       throw error;
     }
-    if ((error as NodeJS.ErrnoException).code === 'EACCES') {
+    if ((error as ErrnoException).code === 'EACCES') {
       throw new InitError(
         `Permission denied: Cannot write to directory "${dirPath}". Check directory permissions.`,
         'PERMISSION_DENIED'

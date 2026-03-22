@@ -118,6 +118,16 @@ export interface AoConfig {
 }
 
 /**
+ * Node.js ErrnoException interface for error handling
+ */
+export interface ErrnoException extends Error {
+  code?: string;
+  errno?: number;
+  syscall?: string;
+  path?: string;
+}
+
+/**
  * Agent configuration
  */
 export interface AgentConfig {
