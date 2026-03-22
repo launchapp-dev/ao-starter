@@ -4,6 +4,7 @@ import path from 'path';
 import { ProjectDetector } from '../detectors/project-detector.js';
 import { TemplateGenerator } from '../templates/template-generator.js';
 import { isValidTemplateId, getTemplateById, getAvailableTemplates, listTemplates } from './templates.js';
+import { setLoggerConfig, logger } from '../utils/logger.js';
 import type { ErrnoException } from '../types/index.js';
 
 /**
@@ -22,6 +23,12 @@ export interface InitOptions {
   dryRun: boolean;
   /** Force override auto-detection */
   force?: boolean;
+  /** Suppress progress messages, only show errors and final result */
+  quiet?: boolean;
+  /** Show detailed step-by-step output during detection and generation */
+  verbose?: boolean;
+  /** Skip all confirmation prompts (non-interactive mode) */
+  yes?: boolean;
 }
 
 /**
@@ -34,6 +41,9 @@ export type initOptions = {
   skipDetect: boolean;
   dryRun: boolean;
   force?: boolean;
+  quiet?: boolean;
+  verbose?: boolean;
+  yes?: boolean;
 };
 
 /**
@@ -141,13 +151,21 @@ function getTemplateDisplayName(templateId?: string): string {
  * Main init command implementation
  */
 export async function initCommand(options: initOptions): Promise<void> {
+  // Configure logger based on options
+  setLoggerConfig({
+    quiet: options.quiet ?? false,
+    verbose: options.verbose ?? false,
+    yes: options.yes ?? false,
+  });
+
   // If --list is passed, show templates and exit
   if (options.list) {
     listTemplates();
     return;
   }
 
-  console.log(chalk.cyan('Initializing AO workflows...\n'));
+  // Banner - shown in normal and verbose modes
+  logger.banner(chalk.cyan('Initializing AO workflows...\n'));
 
   const outputDir = path.resolve(options.output);
 
@@ -157,10 +175,21 @@ export async function initCommand(options: initOptions): Promise<void> {
     const templateName = getTemplateDisplayName(templateId);
 
     // Show selected template
-    console.log(chalk.gray(`Template: ${chalk.white(templateName)}`));
+    logger.info(chalk.gray(`Template: ${chalk.white(templateName)}`));
+
     if (options.dryRun) {
-      console.log(chalk.yellow('Mode: Dry run (no files will be written)\n'));
+      logger.info(chalk.yellow('Mode: Dry run (no files will be written)\n'));
     }
+
+    // Verbose: Show configuration details
+    logger.debug('Configuration:', {
+      output: outputDir,
+      template: templateId || 'auto-detect',
+      dryRun: options.dryRun,
+      force: options.force,
+      quiet: options.quiet,
+      verbose: options.verbose,
+    });
 
     // Check for empty output directory
     if (outputDir !== path.resolve(process.cwd())) {
@@ -171,7 +200,7 @@ export async function initCommand(options: initOptions): Promise<void> {
           // Only warn if directory exists but is empty AND we're in dry-run mode
           // (empty directory is fine for generation)
           if (files.length === 0 && !options.dryRun) {
-            console.log(chalk.yellow(`Note: Output directory "${outputDir}" is empty.\n`));
+            logger.info(chalk.yellow(`Note: Output directory "${outputDir}" is empty.\n`));
           }
         }
       } catch {
@@ -187,9 +216,9 @@ export async function initCommand(options: initOptions): Promise<void> {
     if (!options.dryRun && !options.force) {
       const existingFiles = await checkExistingFiles(outputDir, effectiveProjectType);
       if (existingFiles.length > 0) {
-        console.log(chalk.yellow('Warning: The following files already exist and will be overwritten:\n'));
+        logger.warn('The following files already exist and will be overwritten:\n');
         existingFiles.forEach((file) => {
-          console.log(chalk.gray(`  ${file}`));
+          logger.list(file);
         });
         console.log();
       }
@@ -199,23 +228,40 @@ export async function initCommand(options: initOptions): Promise<void> {
 
     // Auto-detect project type if not specified and --force is not used
     if (!options.skipDetect && !projectType && !options.force) {
+      logger.debug('Starting project type detection...');
+
       const detector = new ProjectDetector();
       const detection = await detector.detect();
       projectType = detection.type;
-      console.log(chalk.gray(`Detected project type: ${chalk.white(projectType || 'unknown')}`));
+
+      logger.info(chalk.gray(`Detected project type: ${chalk.white(projectType || 'unknown')}`));
+      logger.debug('Detection confidence:', detection.confidence);
+
       if (detection.framework) {
-        console.log(chalk.gray(`Framework: ${chalk.white(detection.framework)}`));
+        logger.debug(`Framework: ${detection.framework}`);
+        logger.info(chalk.gray(`Framework: ${chalk.white(detection.framework)}`));
       }
+
+      if (detection.indicators && detection.indicators.length > 0) {
+        logger.detection('Indicators found:');
+        detection.indicators.forEach((indicator) => {
+          logger.list(indicator);
+        });
+      }
+
       console.log();
     } else if (options.force && projectType) {
-      console.log(chalk.gray(`Using specified template: ${chalk.white(projectType)}`));
+      logger.info(chalk.gray(`Using specified template: ${chalk.white(projectType)}`));
       console.log();
     } else if (options.force && !options.template) {
       // With --force, use 'default' template to bypass detection
       projectType = 'default';
-      console.log(chalk.yellow('Note: --force bypasses auto-detection, using default template'));
+      logger.info(chalk.yellow('Note: --force bypasses auto-detection, using default template'));
       console.log();
     }
+
+    // Verbose: Show generation step
+    logger.generation(`Generating ${projectType || 'default'} templates...`);
 
     // Generate templates
     const generator = new TemplateGenerator();
@@ -226,49 +272,55 @@ export async function initCommand(options: initOptions): Promise<void> {
     });
 
     if (options.dryRun) {
-      console.log(chalk.yellow('Dry run - files that would be created:\n'));
+      logger.info(chalk.yellow('Dry run - files that would be created:\n'));
       files.forEach((file) => {
-        console.log(chalk.gray(`  ${file}`));
+        logger.list(file);
       });
     } else {
-      console.log(chalk.green('✓ Created AO workflow files:\n'));
+      logger.success('Created AO workflow files:\n');
       files.forEach((file) => {
-        console.log(chalk.gray(`  ${file}`));
+        logger.list(file);
       });
       console.log();
-      console.log(chalk.green.bold('🎉 AO workflows initialized successfully!'));
-      console.log(chalk.gray('\nNext steps:'));
-      console.log(chalk.gray('  1. Review the generated files in .ao/'));
-      console.log(chalk.gray('  2. Run: ao daemon start'));
-      console.log(chalk.gray('  3. Run: ao task list\n'));
+
+      // In quiet mode, just show the final success message
+      if (logger.isQuiet()) {
+        logger.result('AO workflows initialized successfully!');
+      } else {
+        logger.result(chalk.green.bold('🎉 AO workflows initialized successfully!'));
+        logger.info(chalk.gray('\nNext steps:'));
+        logger.list('1. Review the generated files in .ao/');
+        logger.list('2. Run: ao daemon start');
+        logger.list('3. Run: ao task list\n');
+      }
     }
   } catch (error) {
     if (error instanceof InitError) {
       switch (error.code) {
         case 'INVALID_TEMPLATE':
-          console.error(chalk.red('✗ Invalid template:'));
-          console.error(chalk.red(`  ${error.message}`));
-          console.error(chalk.gray('\nRun ') + chalk.cyan('ao init --list') + chalk.gray(' to see available templates.'));
+          logger.error('Invalid template:');
+          logger.error(`  ${error.message}`);
+          logger.info(chalk.gray('\nRun ') + chalk.cyan('ao init --list') + chalk.gray(' to see available templates.'));
           break;
         case 'PERMISSION_DENIED':
-          console.error(chalk.red('✗ Permission denied:'));
-          console.error(chalk.red(`  ${error.message}`));
-          console.error(chalk.gray('\nTo fix:'));
-          console.error(chalk.gray('  - Check directory ownership: chown -R $USER ' + options.output));
-          console.error(chalk.gray('  - Check directory permissions: chmod u+w ' + options.output));
+          logger.error('Permission denied:');
+          logger.error(`  ${error.message}`);
+          logger.info(chalk.gray('\nTo fix:'));
+          logger.info(chalk.gray('  - Check directory ownership: chown -R $USER ' + options.output));
+          logger.info(chalk.gray('  - Check directory permissions: chmod u+w ' + options.output));
           break;
         case 'EXISTING_FILES':
-          console.error(chalk.red('✗ Existing files detected:'));
-          console.error(chalk.red(`  ${error.message}`));
+          logger.error('Existing files detected:');
+          logger.error(`  ${error.message}`);
           break;
         case 'EMPTY_OUTPUT_DIR':
-          console.error(chalk.red('✗ Empty output directory:'));
-          console.error(chalk.red(`  ${error.message}`));
+          logger.error('Empty output directory:');
+          logger.error(`  ${error.message}`);
           break;
       }
     } else {
-      console.error(chalk.red('✗ Error initializing AO workflows:'));
-      console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+      logger.error('Error initializing AO workflows:');
+      logger.error(error instanceof Error ? error.message : String(error));
     }
     process.exit(1);
   }

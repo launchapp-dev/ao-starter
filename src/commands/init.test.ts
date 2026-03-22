@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 import { initCommand, InitError } from './init.js';
+import { resetLoggerConfig } from '../utils/logger.js';
 import type { initOptions } from './init.js';
 
 describe('initCommand', () => {
@@ -17,16 +18,16 @@ describe('initCommand', () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ao-init-test-'));
     originalCwd = process.cwd();
     process.chdir(tempDir);
-    
+
     // Store original functions
     originalLog = console.log;
     originalError = console.error;
     originalExit = process.exit;
-    
+
     // Initialize output arrays
     logOutput = [];
     errorOutput = [];
-    
+
     // Override console methods
     console.log = (...args: unknown[]) => {
       logOutput.push(args.join(' '));
@@ -37,16 +38,22 @@ describe('initCommand', () => {
     process.exit = (() => {
       throw new Error('process.exit called');
     }) as typeof process.exit;
+
+    // Reset logger config between tests
+    resetLoggerConfig();
   });
 
   afterEach(async () => {
     process.chdir(originalCwd);
     await fs.remove(tempDir);
-    
+
     // Restore original functions
     console.log = originalLog;
     console.error = originalError;
     process.exit = originalExit;
+
+    // Reset logger config
+    resetLoggerConfig();
   });
 
   describe('initCommand with --dry-run', () => {
@@ -447,9 +454,9 @@ describe('initCommand', () => {
 
       await initCommand(options);
 
-      // Should show warning about existing files
+      // Should show warning about existing files (uses ⚠ now)
       const allOutput = logOutput.join('\n');
-      expect(allOutput).toContain('Warning:');
+      expect(allOutput).toContain('⚠');
       expect(allOutput).toContain('already exist');
       expect(allOutput).toContain('agents.yaml');
     });
@@ -645,6 +652,224 @@ describe('initCommand', () => {
       // Should not show any detection messages
       const allOutput = logOutput.join('\n');
       expect(allOutput).not.toContain('Detected project type:');
+    });
+  });
+
+  describe('--quiet flag', () => {
+    it('should suppress progress messages in quiet mode', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        quiet: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      // Should not show banner or template info
+      expect(allOutput).not.toContain('Initializing AO workflows');
+      expect(allOutput).not.toContain('Template:');
+      // Should still show success message
+      expect(allOutput).toContain('initialized successfully');
+    });
+
+    it('should still show errors in quiet mode', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        template: 'invalid-template',
+        quiet: true,
+      };
+
+      await expect(initCommand(options)).rejects.toThrow('process.exit called');
+
+      const allError = errorOutput.join('\n');
+      expect(allError).toContain('Invalid template');
+    });
+
+    it('should still show success message in quiet mode', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        quiet: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      expect(allOutput).toContain('AO workflows initialized successfully');
+    });
+
+    it('should not show next steps in quiet mode', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        quiet: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      expect(allOutput).not.toContain('Next steps');
+      expect(allOutput).not.toContain('daemon start');
+      expect(allOutput).not.toContain('task list');
+    });
+  });
+
+  describe('--verbose flag', () => {
+    it('should show debug messages in verbose mode', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        verbose: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      expect(allOutput).toContain('[debug]');
+    });
+
+    it('should show detection details in verbose mode', async () => {
+      await fs.writeJson('package.json', { name: 'test-project' });
+      await fs.writeJson('tsconfig.json', { compilerOptions: {} });
+
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: false,
+        verbose: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      expect(allOutput).toContain('[detection]');
+      expect(allOutput).toContain('Indicators found:');
+    });
+
+    it('should show generation details in verbose mode', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        verbose: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      expect(allOutput).toContain('[generation]');
+    });
+
+    it('should show step progress in verbose mode', async () => {
+      await fs.writeJson('package.json', { name: 'test-project' });
+
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: false,
+        verbose: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      // Should show detection details in verbose mode
+      expect(allOutput).toContain('[debug]');
+      expect(allOutput).toContain('[detection]');
+      expect(allOutput).toContain('Indicators found:');
+    });
+
+    it('should show configuration in verbose mode', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: true,
+        skipDetect: true,
+        verbose: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      expect(allOutput).toContain('Configuration:');
+    });
+  });
+
+  describe('--yes flag', () => {
+    it('should set yes mode for non-interactive operation', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        yes: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      // Should complete successfully with yes flag
+      expect(allOutput).toContain('initialized successfully');
+    });
+
+    it('should not show warnings about existing files when in yes mode', async () => {
+      // Pre-create a file that would normally show a warning
+      await fs.writeFile(path.join(tempDir, 'agents.yaml'), 'existing');
+
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        yes: true,
+      };
+
+      await initCommand(options);
+
+      // Should still warn about existing files (yes flag is for interactive prompts, not this check)
+      const allOutput = logOutput.join('\n');
+      expect(allOutput).toContain('already exist');
+    });
+  });
+
+  describe('combined flags', () => {
+    it('should respect --quiet and --verbose together (verbose takes precedence)', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        quiet: true,
+        verbose: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      // Verbose should take precedence when both are set
+      expect(allOutput).toContain('[debug]');
+      expect(allOutput).toContain('[generation]');
+    });
+
+    it('should handle --quiet, --verbose, and --yes together', async () => {
+      const options: initOptions = {
+        output: tempDir,
+        dryRun: false,
+        skipDetect: true,
+        quiet: true,
+        verbose: true,
+        yes: true,
+      };
+
+      await initCommand(options);
+
+      const allOutput = logOutput.join('\n');
+      // Verbose takes precedence, so we should see verbose output
+      expect(allOutput).toContain('[debug]');
+      expect(allOutput).toContain('initialized successfully');
     });
   });
 });

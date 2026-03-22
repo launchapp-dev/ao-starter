@@ -41,6 +41,9 @@ Examples:
   $ ao init                  Initialize AO workflows for current project
   $ ao init --template nextjs  Initialize with Next.js template
   $ ao init --list           List available templates
+  $ ao init -y               Initialize without prompts (non-interactive)
+  $ ao init -v               Show detailed output during initialization
+  $ ao init -q               Quiet mode (errors and final result only)
   $ ao templates             List all available templates
   $ ao list-templates        List all available templates (alternative command)
   $ ao list-templates --json  List templates in JSON format
@@ -77,6 +80,18 @@ For more information, see https://github.com/launchapp-dev/ao-starter`
     .option(
       '--dry-run',
       'Preview changes without writing files'
+    )
+    .option(
+      '-q, --quiet',
+      'Suppress progress messages, only show errors and final result'
+    )
+    .option(
+      '-v, --verbose',
+      'Show detailed step-by-step output during detection and generation'
+    )
+    .option(
+      '-y, --yes',
+      'Skip all confirmation prompts (non-interactive mode)'
     )
     .action(initCommand);
 
