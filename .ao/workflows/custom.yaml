@@ -142,10 +142,6 @@ schedules:
     cron: "*/3 * * * *"
     workflow_ref: pr-reviewer
     enabled: true
-  - id: product-review
-    cron: "*/10 * * * *"
-    workflow_ref: product-review
-    enabled: true
   - id: sync-main
     cron: "*/5 * * * *"
     workflow_ref: sync-main
