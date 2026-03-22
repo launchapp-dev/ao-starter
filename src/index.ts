@@ -4,7 +4,8 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { initCommand } from './commands/init.js';
 import { detectCommand } from './commands/detect.js';
-import { listTemplates } from './commands/templates.js';
+import { templatesCommand, listTemplates } from './commands/templates.js';
+import type { TemplatesOptions } from './commands/templates.js';
 
 /**
  * CLI version - matches package.json version
@@ -17,6 +18,7 @@ const VERSION = '0.1.0';
 const COMMANDS = {
   INIT: 'init',
   DETECT: 'detect',
+  TEMPLATES: 'templates',
 } as const;
 
 /**
@@ -37,8 +39,10 @@ function configureProgram(): Command {
 Examples:
   $ ao init                  Initialize AO workflows for current project
   $ ao init --template nextjs  Initialize with Next.js template
-  $ ao init --list           List available templates
-  $ ao detect                Detect project type
+  $ ao templates              List all available templates
+  $ ao templates nextjs        Show details for Next.js template
+  $ ao templates --json        Output templates in JSON format
+  $ ao detect                 Detect project type
 
 For more information, see https://github.com/launchapp-dev/ao-starter`
     );
@@ -80,6 +84,16 @@ For more information, see https://github.com/launchapp-dev/ao-starter`
     .description('Detect project type and show recommendations')
     .option('--json', 'Output in JSON format')
     .action(detectCommand);
+
+  // Register templates command
+  prog
+    .command(COMMANDS.TEMPLATES)
+    .description('List and show details for available templates')
+    .argument('[name]', 'Template name to show details for')
+    .option('--json', 'Output in JSON format')
+    .action((name: string | undefined, options: TemplatesOptions) => {
+      templatesCommand({ ...options, name });
+    });
 
   return prog;
 }

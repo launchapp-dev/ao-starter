@@ -17,6 +17,30 @@ export interface TemplateInfo {
 }
 
 /**
+ * Detailed template information for specific template view
+ */
+export interface DetailedTemplateInfo extends TemplateInfo {
+  /** List of files this template generates */
+  files: string[];
+  /** Agents used by this template */
+  agents: string[];
+  /** Phases defined by this template */
+  phases: string[];
+  /** Example usage command */
+  usage: string;
+}
+
+/**
+ * CLI options for the templates command
+ */
+export interface TemplatesOptions {
+  /** Show details for a specific template */
+  name?: string;
+  /** Output in JSON format */
+  json?: boolean;
+}
+
+/**
  * List of all available templates with metadata
  */
 const AVAILABLE_TEMPLATES: TemplateInfo[] = [
@@ -79,10 +103,82 @@ const AVAILABLE_TEMPLATES: TemplateInfo[] = [
 ];
 
 /**
+ * Detailed information for each template
+ */
+const TEMPLATE_DETAILS: Record<string, Omit<DetailedTemplateInfo, keyof TemplateInfo>> = {
+  default: {
+    files: ['agents.yaml', 'phases.yaml', 'workflows.yaml', 'custom.yaml', 'README.md'],
+    agents: ['planner', 'implementer', 'reviewer'],
+    phases: ['plan', 'implement', 'review', 'test'],
+    usage: 'ao init --template default',
+  },
+  typescript: {
+    files: ['agents.yaml', 'phases.yaml', 'workflows.yaml', 'custom.yaml', 'README.md'],
+    agents: ['planner', 'implementer', 'reviewer'],
+    phases: ['plan', 'implement', 'typecheck', 'lint', 'review', 'test'],
+    usage: 'ao init --template typescript',
+  },
+  'typescript-monorepo': {
+    files: ['agents.yaml', 'phases.yaml', 'workflows.yaml', 'custom.yaml', 'README.md'],
+    agents: ['planner', 'implementer', 'reviewer'],
+    phases: ['plan', 'implement', 'typecheck', 'lint', 'build', 'review', 'test'],
+    usage: 'ao init --template typescript-monorepo',
+  },
+  javascript: {
+    files: ['agents.yaml', 'phases.yaml', 'workflows.yaml', 'custom.yaml', 'README.md'],
+    agents: ['planner', 'implementer', 'reviewer'],
+    phases: ['plan', 'implement', 'lint', 'review', 'test'],
+    usage: 'ao init --template javascript',
+  },
+  nextjs: {
+    files: ['agents.yaml', 'phases.yaml', 'workflows.yaml', 'custom.yaml', 'README.md'],
+    agents: ['planner', 'implementer', 'reviewer'],
+    phases: ['plan', 'implement', 'build', 'typecheck', 'lint', 'review', 'test'],
+    usage: 'ao init --template nextjs',
+  },
+  rust: {
+    files: ['agents.yaml', 'phases.yaml', 'workflows.yaml', 'custom.yaml', 'README.md'],
+    agents: ['planner', 'implementer', 'reviewer'],
+    phases: ['plan', 'implement', 'clippy', 'fmt', 'review', 'test', 'benchmark'],
+    usage: 'ao init --template rust',
+  },
+  'rust-workspace': {
+    files: ['agents.yaml', 'phases.yaml', 'workflows.yaml', 'custom.yaml', 'README.md'],
+    agents: ['planner', 'implementer', 'reviewer'],
+    phases: ['plan', 'implement', 'clippy', 'fmt', 'build', 'review', 'test', 'benchmark'],
+    usage: 'ao init --template rust-workspace',
+  },
+  python: {
+    files: ['agents.yaml', 'phases.yaml', 'workflows.yaml', 'custom.yaml', 'README.md'],
+    agents: ['planner', 'implementer', 'reviewer'],
+    phases: ['plan', 'implement', 'lint', 'typecheck', 'review', 'test'],
+    usage: 'ao init --template python',
+  },
+};
+
+/**
  * Get all available templates
  */
 export function getAvailableTemplates(): TemplateInfo[] {
   return AVAILABLE_TEMPLATES;
+}
+
+/**
+ * Get detailed information for a specific template
+ */
+export function getDetailedTemplate(id: string): DetailedTemplateInfo | undefined {
+  const template = getTemplateById(id);
+  if (!template) {
+    return undefined;
+  }
+  const details = TEMPLATE_DETAILS[id];
+  if (!details) {
+    return undefined;
+  }
+  return {
+    ...template,
+    ...details,
+  };
 }
 
 /**
@@ -189,4 +285,101 @@ function detectProjectFromFiles(): Array<{ type: string; template: string }> {
   return recommendations;
 }
 
-// Re-export InitOptions type for use in other modules
+/**
+ * Output templates in JSON format
+ */
+function outputJson(options: TemplatesOptions): void {
+  if (options.name) {
+    const template = getDetailedTemplate(options.name);
+    if (!template) {
+      console.error(chalk.red(`✗ Template "${options.name}" not found`));
+      const availableIds = AVAILABLE_TEMPLATES.map((t) => t.id).join(', ');
+      console.error(chalk.gray(`Available templates: ${availableIds}`));
+      process.exit(1);
+    }
+    console.log(JSON.stringify(template, null, 2));
+  } else {
+    const templates = AVAILABLE_TEMPLATES.map((t) => {
+      const details = TEMPLATE_DETAILS[t.id];
+      return {
+        ...t,
+        ...details,
+      };
+    });
+    console.log(JSON.stringify(templates, null, 2));
+  }
+}
+
+/**
+ * Main templates command implementation
+ */
+export async function templatesCommand(options: TemplatesOptions): Promise<void> {
+  if (options.json) {
+    outputJson(options);
+    return;
+  }
+
+  if (options.name) {
+    showTemplateDetails(options.name);
+  } else {
+    listTemplates();
+  }
+}
+
+/**
+ * Show detailed information for a specific template
+ */
+function showTemplateDetails(name: string): void {
+  const template = getDetailedTemplate(name);
+
+  if (!template) {
+    console.error(chalk.red(`✗ Template "${name}" not found`));
+    console.error(chalk.gray('\nRun ') + chalk.cyan('ao templates') + chalk.gray(' to see available templates.'));
+    process.exit(1);
+  }
+
+  console.log(chalk.bold(`\n📦 Template: ${template.name}\n`));
+
+  // Description
+  console.log(`  ${chalk.gray('Description:')} ${chalk.white(template.description)}`);
+
+  // Default badge
+  if (template.isDefault) {
+    console.log(chalk.green('  ✓ Default template'));
+  }
+
+  console.log();
+
+  // Suitable for
+  console.log(`  ${chalk.gray('Suitable for:')}`);
+  template.suitableFor.forEach((s) => {
+    console.log(`    ${chalk.green('•')} ${s}`);
+  });
+  console.log();
+
+  // Files generated
+  console.log(`  ${chalk.gray('Files generated:')}`);
+  template.files.forEach((f) => {
+    console.log(`    ${chalk.cyan('•')} ${f}`);
+  });
+  console.log();
+
+  // Agents
+  console.log(`  ${chalk.gray('Agents:')}`);
+  template.agents.forEach((a) => {
+    console.log(`    ${chalk.magenta('•')} ${a}`);
+  });
+  console.log();
+
+  // Phases
+  console.log(`  ${chalk.gray('Phases:')}`);
+  template.phases.forEach((p) => {
+    console.log(`    ${chalk.blue('•')} ${p}`);
+  });
+  console.log();
+
+  // Usage
+  console.log(chalk.bold('  Usage:\n'));
+  console.log(`    ${chalk.cyan(template.usage)}`);
+  console.log();
+}
