@@ -1,0 +1,152 @@
+tools_allowlist:
+  - git
+  - gh
+  - node
+  - npx
+  - npm
+  - pnpm
+
+mcp_servers:
+  context7:
+    command: npx
+    args: ["-y", "@upstash/context7-mcp"]
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+
+agents:
+  default:
+    model: kimi-code/kimi-for-coding
+    tool: oai-runner
+
+  implementer:
+    system_prompt: |
+      You implement code for ao-starter. Build the create-ao CLI scaffolder.
+      Write clean TypeScript. Follow existing patterns.
+      Commit with descriptive messages. Do not add yourself as author.
+    model: kimi-code/kimi-for-coding
+    tool: oai-runner
+    mcp_servers: ["ao", "context7"]
+
+  reviewer:
+    system_prompt: |
+      You review PRs for ao-starter.
+      Check: code quality, TypeScript types, missing exports, security.
+      Use merge_pull_request MCP tool to merge good PRs.
+      Close conflicting PRs after 3 failed rebases.
+    model: minimax/MiniMax-M2.7
+    tool: oai-runner
+    mcp_servers: ["ao", "github"]
+
+  planner:
+    system_prompt: |
+      You plan work for ao-starter. Build a CLI that generates AO workflow configs for any project type (TypeScript monorepo, Rust, Python).
+      Check ao.queue.list — max 3 items. Check open PRs — pause at 5+.
+      Read VISION.md and requirements before creating tasks.
+    model: minimax/MiniMax-M2.7
+    tool: oai-runner
+    mcp_servers: ["ao"]
+
+  product-owner:
+    system_prompt: |
+      You are the Product Owner for ao-starter. Build a CLI that generates AO workflow configs for any project type (TypeScript monorepo, Rust, Python).
+      Read VISION.md every run. Create requirements and tasks.
+      NEVER remove features. Only ADD and IMPROVE.
+    model: minimax/MiniMax-M2.7
+    tool: oai-runner
+    mcp_servers: ["ao", "github"]
+
+phases:
+  implementation:
+    mode: agent
+    agent: implementer
+    directive: "Implement the task. Write code, commit."
+    capabilities:
+      mutates_state: true
+
+  push-branch:
+    mode: command
+    command:
+      program: git
+      args: ["push", "-u", "origin", "HEAD"]
+      cwd_mode: task_root
+      timeout_secs: 60
+
+  create-pr:
+    mode: command
+    command:
+      program: gh
+      args: ["pr", "create", "--fill", "--base", "main"]
+      cwd_mode: task_root
+      timeout_secs: 60
+
+  pr-review:
+    mode: agent
+    agent: reviewer
+    directive: "Review this PR. Merge if good, request changes if not."
+
+  pr-review-sweep:
+    mode: agent
+    agent: reviewer
+    directive: "Pick ONE open PR. Merge, close, or queue rebase."
+    capabilities:
+      mutates_state: true
+
+  work-planning:
+    mode: agent
+    agent: planner
+    directive: "Check tasks and queue. Enqueue ready work."
+
+  product-review:
+    mode: agent
+    agent: product-owner
+    directive: "Review progress. Create tasks for gaps."
+    capabilities:
+      mutates_state: true
+
+  sync-main:
+    mode: command
+    command:
+      program: git
+      args: ["pull", "origin", "main", "--ff-only"]
+      timeout_secs: 30
+
+workflows:
+  - id: standard
+    phases: [implementation, push-branch, create-pr, pr-review]
+
+  - id: scaffold
+    phases: [implementation, push-branch, create-pr, pr-review]
+
+  - id: quick-fix
+    phases: [implementation, push-branch, create-pr, pr-review]
+
+  - id: work-planner
+    phases: [work-planning]
+
+  - id: pr-reviewer
+    phases: [pr-review-sweep]
+
+  - id: product-review
+    phases: [product-review]
+
+  - id: sync-main
+    phases: [sync-main]
+
+schedules:
+  - id: work-planner
+    cron: "*/5 * * * *"
+    workflow_ref: work-planner
+    enabled: true
+  - id: pr-reviewer
+    cron: "*/3 * * * *"
+    workflow_ref: pr-reviewer
+    enabled: true
+  - id: product-review
+    cron: "*/10 * * * *"
+    workflow_ref: product-review
+    enabled: true
+  - id: sync-main
+    cron: "*/5 * * * *"
+    workflow_ref: sync-main
+    enabled: true
