@@ -4,6 +4,7 @@ import path from 'path';
 import { ProjectDetector } from '../detectors/project-detector.js';
 import { TemplateGenerator } from '../templates/template-generator.js';
 import { isValidTemplateId, getTemplateById, getAvailableTemplates, listTemplates } from './templates.js';
+import { selectTemplateInteractive, isInteractiveTerminal } from '../utils/prompts.js';
 import type { ErrnoException } from '../types/index.js';
 
 /**
@@ -40,11 +41,11 @@ export type initOptions = {
  * Custom error class for init command errors
  */
 export class InitError extends Error {
-  public readonly code: 'INVALID_TEMPLATE' | 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR';
+  public readonly code: 'INVALID_TEMPLATE' | 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR' | 'PROMPT_CANCELLED';
 
   constructor(
     message: string,
-    code: 'INVALID_TEMPLATE' | 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR'
+    code: 'INVALID_TEMPLATE' | 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR' | 'PROMPT_CANCELLED'
   ) {
     super(message);
     this.name = 'InitError';
@@ -138,6 +139,46 @@ function getTemplateDisplayName(templateId?: string): string {
 }
 
 /**
+ * Get template via interactive selection when --template is not provided
+ * Returns undefined if user cancels or terminal is not interactive
+ */
+async function getTemplateInteractively(
+  detectedType?: string
+): Promise<string | undefined> {
+  // Only show interactive prompt if terminal supports it
+  if (!isInteractiveTerminal()) {
+    return undefined;
+  }
+
+  console.log();
+  console.log(chalk.cyan('┌─────────────────────────────────────────────────────────────┐'));
+  console.log(chalk.cyan('│') + chalk.white.bold('  Select a template for your project') + ' '.repeat(18) + chalk.cyan('│'));
+  console.log(chalk.cyan('└─────────────────────────────────────────────────────────────┘'));
+  console.log();
+
+  const templates = getAvailableTemplates();
+
+  // Try to detect project type if not provided
+  let recommendedTemplate: string | undefined;
+  if (detectedType && isValidTemplateId(detectedType)) {
+    recommendedTemplate = detectedType;
+  }
+
+  const result = await selectTemplateInteractive({
+    templates,
+    message: 'Which template would you like to use?',
+    defaultTemplate: recommendedTemplate || 'default',
+  });
+
+  if (result.cancelled) {
+    console.log(chalk.yellow('\n✗ Template selection cancelled'));
+    return undefined;
+  }
+
+  return result.templateId;
+}
+
+/**
  * Main init command implementation
  */
 export async function initCommand(options: initOptions): Promise<void> {
@@ -152,15 +193,9 @@ export async function initCommand(options: initOptions): Promise<void> {
   const outputDir = path.resolve(options.output);
 
   try {
-    // Validate template
-    const templateId = validateTemplate(options.template);
-    const templateName = getTemplateDisplayName(templateId);
-
-    // Show selected template
-    console.log(chalk.gray(`Template: ${chalk.white(templateName)}`));
-    if (options.dryRun) {
-      console.log(chalk.yellow('Mode: Dry run (no files will be written)\n'));
-    }
+    // Validate template if provided
+    let templateId = validateTemplate(options.template);
+    let templateName = getTemplateDisplayName(templateId);
 
     // Check for empty output directory
     if (outputDir !== path.resolve(process.cwd())) {
@@ -197,23 +232,55 @@ export async function initCommand(options: initOptions): Promise<void> {
 
     let projectType = templateId;
 
-    // Auto-detect project type if not specified and --force is not used
+    // Auto-detect project type first (before interactive selection)
+    let detectedType: string | undefined;
     if (!options.skipDetect && !projectType && !options.force) {
       const detector = new ProjectDetector();
       const detection = await detector.detect();
-      projectType = detection.type;
-      console.log(chalk.gray(`Detected project type: ${chalk.white(projectType || 'unknown')}`));
-      if (detection.framework) {
-        console.log(chalk.gray(`Framework: ${chalk.white(detection.framework)}`));
+      detectedType = detection.type;
+      // Show detection info if applicable
+      if (!isInteractiveTerminal()) {
+        console.log(chalk.gray(`Detected project type: ${chalk.white(detectedType || 'unknown')}`));
       }
+    }
+
+    // If no template specified and not in force mode, show interactive selection
+    if (!projectType && !options.force && !options.template) {
+      // If we detected a type, show the prompt with recommendation
+      if (isInteractiveTerminal()) {
+        const interactiveTemplate = await getTemplateInteractively(detectedType);
+
+        if (interactiveTemplate) {
+          projectType = interactiveTemplate;
+          templateName = getTemplateDisplayName(projectType);
+        } else {
+          // User cancelled - exit gracefully
+          console.log(chalk.gray('\nNo template selected. Run ') +
+            chalk.cyan('ao init --template <name>') +
+            chalk.gray(' to specify a template.'));
+          return;
+        }
+      } else if (detectedType && isValidTemplateId(detectedType)) {
+        // Non-interactive: use detected type if valid
+        projectType = detectedType;
+        templateName = getTemplateDisplayName(projectType);
+      }
+    }
+
+    // Show template selection
+    console.log(chalk.gray(`Template: ${chalk.white(templateName)}`));
+    if (options.dryRun) {
+      console.log(chalk.yellow('Mode: Dry run (no files will be written)\n'));
+    }
+
+    // Handle force mode
+    if (options.force && !projectType) {
+      projectType = 'default';
+      templateName = getTemplateDisplayName(projectType);
+      console.log(chalk.yellow('Note: --force bypasses auto-detection, using default template'));
       console.log();
     } else if (options.force && projectType) {
       console.log(chalk.gray(`Using specified template: ${chalk.white(projectType)}`));
-      console.log();
-    } else if (options.force && !options.template) {
-      // With --force, use 'default' template to bypass detection
-      projectType = 'default';
-      console.log(chalk.yellow('Note: --force bypasses auto-detection, using default template'));
       console.log();
     }
 
@@ -264,6 +331,9 @@ export async function initCommand(options: initOptions): Promise<void> {
         case 'EMPTY_OUTPUT_DIR':
           console.error(chalk.red('✗ Empty output directory:'));
           console.error(chalk.red(`  ${error.message}`));
+          break;
+        case 'PROMPT_CANCELLED':
+          console.error(chalk.yellow('✗ Operation cancelled'));
           break;
       }
     } else {
