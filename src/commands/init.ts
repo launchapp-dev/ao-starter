@@ -3,26 +3,79 @@ import fs from 'fs-extra';
 import path from 'path';
 import { ProjectDetector } from '../detectors/project-detector.js';
 import { TemplateGenerator } from '../templates/template-generator.js';
+import { isValidTemplateId, getTemplateById, listTemplates } from './templates.js';
 import type { ErrnoException } from '../types/index.js';
 
+/**
+ * CLI options for the init command
+ */
 export interface InitOptions {
+  /** Use a specific template */
   template?: string;
+  /** List available templates */
+  list?: boolean;
+  /** Output directory for generated files */
+  output: string;
+  /** Skip automatic project detection */
+  skipDetect: boolean;
+  /** Preview changes without writing files */
+  dryRun: boolean;
+}
+
+/**
+ * Init command options passed from commander (camelCase)
+ */
+export type initOptions = {
+  template?: string;
+  list?: boolean;
   output: string;
   skipDetect: boolean;
   dryRun: boolean;
-}
+};
 
 /**
  * Custom error class for init command errors
  */
 export class InitError extends Error {
-  public readonly code: 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR';
+  public readonly code: 'INVALID_TEMPLATE' | 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR';
 
-  constructor(message: string, code: 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR') {
+  constructor(
+    message: string,
+    code: 'INVALID_TEMPLATE' | 'PERMISSION_DENIED' | 'EXISTING_FILES' | 'EMPTY_OUTPUT_DIR'
+  ) {
     super(message);
     this.name = 'InitError';
     this.code = code;
   }
+}
+
+/**
+ * Validate the provided template name
+ */
+function validateTemplate(template?: string): string | undefined {
+  if (!template) {
+    return undefined;
+  }
+
+  if (!isValidTemplateId(template)) {
+    const available = [
+      'default',
+      'typescript',
+      'typescript-monorepo',
+      'javascript',
+      'nextjs',
+      'rust',
+      'rust-workspace',
+      'python',
+    ].join(', ');
+
+    throw new InitError(
+      `Invalid template "${template}". Available templates: ${available}\nRun 'ao init --list' to see all templates.`,
+      'INVALID_TEMPLATE'
+    );
+  }
+
+  return template;
 }
 
 /**
@@ -57,12 +110,12 @@ async function checkWritePermission(dirPath: string): Promise<void> {
 /**
  * Check for existing files in the output directory
  */
-async function checkExistingFiles(outputDir: string): Promise<string[]> {
+async function checkExistingFiles(outputDir: string, projectType: string): Promise<string[]> {
   const existingFiles: string[] = [];
   const generator = new TemplateGenerator();
 
   // Get all files that would be generated
-  const files = generator.getFilesForProjectType('default');
+  const files = generator.getFilesForProjectType(projectType);
 
   for (const file of files) {
     const filePath = path.join(outputDir, file.outputPath);
@@ -77,12 +130,42 @@ async function checkExistingFiles(outputDir: string): Promise<string[]> {
   return existingFiles;
 }
 
-export async function initCommand(options: InitOptions): Promise<void> {
+/**
+ * Get a nice display name for the template
+ */
+function getTemplateDisplayName(templateId?: string): string {
+  if (!templateId) {
+    return 'Default';
+  }
+  const template = getTemplateById(templateId);
+  return template?.name || templateId;
+}
+
+/**
+ * Main init command implementation
+ */
+export async function initCommand(options: initOptions): Promise<void> {
+  // If --list is passed, show templates and exit
+  if (options.list) {
+    listTemplates();
+    return;
+  }
+
   console.log(chalk.cyan('Initializing AO workflows...\n'));
 
   const outputDir = path.resolve(options.output);
 
   try {
+    // Validate template
+    const templateId = validateTemplate(options.template);
+    const templateName = getTemplateDisplayName(templateId);
+
+    // Show selected template
+    console.log(chalk.gray(`Template: ${chalk.white(templateName)}`));
+    if (options.dryRun) {
+      console.log(chalk.yellow('Mode: Dry run (no files will be written)\n'));
+    }
+
     // Check for empty output directory
     if (outputDir !== path.resolve(process.cwd())) {
       try {
@@ -104,18 +187,19 @@ export async function initCommand(options: InitOptions): Promise<void> {
     await checkWritePermission(outputDir);
 
     // Check for existing files (only in non-dry-run mode)
+    const effectiveProjectType = templateId || 'default';
     if (!options.dryRun) {
-      const existingFiles = await checkExistingFiles(outputDir);
+      const existingFiles = await checkExistingFiles(outputDir, effectiveProjectType);
       if (existingFiles.length > 0) {
         console.log(chalk.yellow('Warning: The following files already exist and will be overwritten:\n'));
-        existingFiles.forEach(file => {
+        existingFiles.forEach((file) => {
           console.log(chalk.gray(`  ${file}`));
         });
         console.log();
       }
     }
 
-    let projectType = options.template;
+    let projectType = templateId;
 
     // Auto-detect project type if not specified
     if (!options.skipDetect && !projectType) {
@@ -139,12 +223,12 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
     if (options.dryRun) {
       console.log(chalk.yellow('Dry run - files that would be created:\n'));
-      files.forEach(file => {
+      files.forEach((file) => {
         console.log(chalk.gray(`  ${file}`));
       });
     } else {
       console.log(chalk.green('✓ Created AO workflow files:\n'));
-      files.forEach(file => {
+      files.forEach((file) => {
         console.log(chalk.gray(`  ${file}`));
       });
       console.log();
@@ -157,6 +241,11 @@ export async function initCommand(options: InitOptions): Promise<void> {
   } catch (error) {
     if (error instanceof InitError) {
       switch (error.code) {
+        case 'INVALID_TEMPLATE':
+          console.error(chalk.red('✗ Invalid template:'));
+          console.error(chalk.red(`  ${error.message}`));
+          console.error(chalk.gray('\nRun ') + chalk.cyan('ao init --list') + chalk.gray(' to see available templates.'));
+          break;
         case 'PERMISSION_DENIED':
           console.error(chalk.red('✗ Permission denied:'));
           console.error(chalk.red(`  ${error.message}`));
