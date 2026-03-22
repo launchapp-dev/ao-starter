@@ -3,7 +3,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { ProjectDetector } from '../detectors/project-detector.js';
 import { TemplateGenerator } from '../templates/template-generator.js';
-import { isValidTemplateId, getTemplateById, listTemplates } from './templates.js';
+import { isValidTemplateId, getTemplateById, getAvailableTemplates, listTemplates } from './templates.js';
 import type { ErrnoException } from '../types/index.js';
 
 /**
@@ -61,16 +61,9 @@ function validateTemplate(template?: string): string | undefined {
   }
 
   if (!isValidTemplateId(template)) {
-    const available = [
-      'default',
-      'typescript',
-      'typescript-monorepo',
-      'javascript',
-      'nextjs',
-      'rust',
-      'rust-workspace',
-      'python',
-    ].join(', ');
+    const available = getAvailableTemplates()
+      .map((t) => t.id)
+      .join(', ');
 
     throw new InitError(
       `Invalid template "${template}". Available templates: ${available}\nRun 'ao init --list' to see all templates.`,

@@ -59,6 +59,14 @@ describe('TemplateGenerator', () => {
       expect(files.map((f) => f.outputPath)).toContain('phases-rust.yaml');
     });
 
+    it('should return Rust files for rust-workspace project type', () => {
+      const files = generator.getFilesForProjectType('rust-workspace');
+      
+      expect(files).toHaveLength(6);
+      expect(files.map((f) => f.outputPath)).toContain('agents-rust.yaml');
+      expect(files.map((f) => f.outputPath)).toContain('phases-rust.yaml');
+    });
+
     it('should return Python files for python project type', () => {
       const files = generator.getFilesForProjectType('python');
       
