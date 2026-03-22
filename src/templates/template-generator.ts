@@ -192,6 +192,18 @@ export class TemplateGenerator {
           { template: 'deno-agents.yaml.hbs', outputPath: 'agents-deno.yaml', description: 'Deno agents' },
           { template: 'deno-phases.yaml.hbs', outputPath: 'phases-deno.yaml', description: 'Deno phases' },
         ];
+      case 'typescript':
+        return [
+          ...baseFiles,
+          { template: 'typescript-agents.yaml.hbs', outputPath: 'agents-typescript.yaml', description: 'TypeScript agents' },
+          { template: 'typescript-phases.yaml.hbs', outputPath: 'phases-typescript.yaml', description: 'TypeScript phases' },
+        ];
+      case 'javascript':
+        return [
+          ...baseFiles,
+          { template: 'javascript-agents.yaml.hbs', outputPath: 'agents-javascript.yaml', description: 'JavaScript agents' },
+          { template: 'javascript-phases.yaml.hbs', outputPath: 'phases-javascript.yaml', description: 'JavaScript phases' },
+        ];
       default:
         return baseFiles;
     }

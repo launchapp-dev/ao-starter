@@ -101,10 +101,26 @@ describe('TemplateGenerator', () => {
 
     it('should return Go files for go project type', () => {
       const files = generator.getFilesForProjectType('go');
-      
+
       expect(files).toHaveLength(6);
       expect(files.map((f) => f.outputPath)).toContain('agents-go.yaml');
       expect(files.map((f) => f.outputPath)).toContain('phases-go.yaml');
+    });
+
+    it('should return TypeScript files for typescript project type', () => {
+      const files = generator.getFilesForProjectType('typescript');
+
+      expect(files).toHaveLength(6);
+      expect(files.map((f) => f.outputPath)).toContain('agents-typescript.yaml');
+      expect(files.map((f) => f.outputPath)).toContain('phases-typescript.yaml');
+    });
+
+    it('should return JavaScript files for javascript project type', () => {
+      const files = generator.getFilesForProjectType('javascript');
+
+      expect(files).toHaveLength(6);
+      expect(files.map((f) => f.outputPath)).toContain('agents-javascript.yaml');
+      expect(files.map((f) => f.outputPath)).toContain('phases-javascript.yaml');
     });
   });
 
