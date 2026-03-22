@@ -312,9 +312,6 @@ export class ProjectDetector {
 
     const packageJson = await this.fileExists('package.json');
 
-    // Bun projects may have package.json, check if TypeScript
-    const hasTsconfig = await this.fileExists('tsconfig.json');
-
     const indicators: string[] = [];
     if (bunLockb) indicators.push('bun.lockb');
     if (bunfig) indicators.push('bunfig.toml');
