@@ -57,6 +57,30 @@ describe('templates', () => {
       expect(template).toBeDefined();
       expect(template?.name).toBe('Rust Workspace');
     });
+
+    it('should find bun template', () => {
+      const template = getTemplateById('bun');
+      expect(template).toBeDefined();
+      expect(template?.name).toBe('Bun');
+    });
+
+    it('should find deno template', () => {
+      const template = getTemplateById('deno');
+      expect(template).toBeDefined();
+      expect(template?.name).toBe('Deno');
+    });
+
+    it('should find go template', () => {
+      const template = getTemplateById('go');
+      expect(template).toBeDefined();
+      expect(template?.name).toBe('Go');
+    });
+
+    it('should find elixir template', () => {
+      const template = getTemplateById('elixir');
+      expect(template).toBeDefined();
+      expect(template?.name).toBe('Elixir');
+    });
   });
 
   describe('isValidTemplateId', () => {
@@ -69,6 +93,10 @@ describe('templates', () => {
       expect(isValidTemplateId('python')).toBe(true);
       expect(isValidTemplateId('javascript')).toBe(true);
       expect(isValidTemplateId('typescript-monorepo')).toBe(true);
+      expect(isValidTemplateId('bun')).toBe(true);
+      expect(isValidTemplateId('deno')).toBe(true);
+      expect(isValidTemplateId('go')).toBe(true);
+      expect(isValidTemplateId('elixir')).toBe(true);
     });
 
     it('should return false for invalid template ids', () => {

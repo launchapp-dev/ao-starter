@@ -292,6 +292,18 @@ ao templates
   python                  Python workflows with mypy, pytest, and poetry support
     Suitable for: Python projects, ML/data projects, API backends
 
+  bun                     Bun-optimized workflows with fast test execution and bundling
+    Suitable for: Bun projects, JavaScript/TypeScript, High-performance apps
+
+  deno                    Deno-optimized workflows with built-in testing and security
+    Suitable for: Deno projects, TypeScript, Secure serverless
+
+  go                      Go-optimized workflows with go vet, golint, and testing
+    Suitable for: Go projects, CLI tools, Network services, Microservices
+
+  elixir                  Elixir-optimized workflows with mix, ExUnit, and credo
+    Suitable for: Elixir projects, Phoenix apps, Distributed systems
+
 Usage:
   ao init --template <template-id>
 
@@ -300,6 +312,10 @@ Usage:
   • For Next.js projects, use: --template nextjs
   • For Rust projects, use: --template rust
   • For Python projects, use: --template python
+  • For Bun projects, use: --template bun
+  • For Deno projects, use: --template deno
+  • For Go projects, use: --template go
+  • For Elixir projects, use: --template elixir
 ```
 
 ---
@@ -316,6 +332,10 @@ Usage:
 | **rust** | Rust with clippy and fmt | Rust, CLI tools |
 | **rust-workspace** | Multi-crate for workspaces | Rust workspaces |
 | **python** | Python with pytest and mypy | Python, ML, APIs |
+| **bun** | Bun with fast test and bundling | Bun, JavaScript, TypeScript |
+| **deno** | Deno with built-in testing | Deno, TypeScript, Serverless |
+| **go** | Go with vet and golint | Go, CLI tools, Microservices |
+| **elixir** | Elixir with mix and credo | Elixir, Phoenix, Distributed systems |
 
 ### Template-Specific Features
 
