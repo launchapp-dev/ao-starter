@@ -156,6 +156,7 @@ export class TemplateGenerator {
           { template: 'nextjs-phases.yaml.hbs', outputPath: 'phases-nextjs.yaml', description: 'Next.js phases' },
         ];
       case 'rust':
+      case 'rust-workspace':
         return [
           ...baseFiles,
           { template: 'rust-agents.yaml.hbs', outputPath: 'agents-rust.yaml', description: 'Rust agents' },
