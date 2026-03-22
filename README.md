@@ -55,6 +55,35 @@
 npm install -g ao-starter
 ```
 
+### Shell Script Installation (No npm required)
+
+For systems with curl and Node.js but without npm, use the shell script installer:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/launchapp-dev/ao-starter/main/install.sh | bash
+```
+
+Or download and run locally:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/launchapp-dev/ao-starter/main/install.sh -o install.sh
+chmod +x install.sh
+./install.sh
+```
+
+**Installer options:**
+
+```bash
+# Install a specific version
+curl -fsSL https://raw.githubusercontent.com/launchapp-dev/ao-starter/main/install.sh | bash -s -- --version 0.1.0
+
+# Uninstall
+curl -fsSL https://raw.githubusercontent.com/launchapp-dev/ao-starter/main/install.sh | bash -s -- --uninstall
+
+# Force npm installation method
+curl -fsSL https://raw.githubusercontent.com/launchapp-dev/ao-starter/main/install.sh | bash -s -- --npm
+```
+
 This installs `ao` (or `create-ao`) globally, making it available from anywhere:
 
 ```bash
