@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import { initCommand } from './commands/init.js';
 import { detectCommand } from './commands/detect.js';
 import { listTemplates } from './commands/templates.js';
+import { listTemplatesCommand } from './commands/list-templates.js';
 
 /**
  * CLI version - matches package.json version
@@ -18,6 +19,7 @@ const COMMANDS = {
   INIT: 'init',
   DETECT: 'detect',
   TEMPLATES: 'templates',
+  LIST_TEMPLATES: 'list-templates',
 } as const;
 
 /**
@@ -40,6 +42,8 @@ Examples:
   $ ao init --template nextjs  Initialize with Next.js template
   $ ao init --list           List available templates
   $ ao templates             List all available templates
+  $ ao list-templates        List all available templates (alternative command)
+  $ ao list-templates --json  List templates in JSON format
   $ ao detect                Detect project type
 
 For more information, see https://github.com/launchapp-dev/ao-starter`
@@ -88,6 +92,13 @@ For more information, see https://github.com/launchapp-dev/ao-starter`
     .command(COMMANDS.TEMPLATES)
     .description('List all available templates with their descriptions')
     .action(listTemplates);
+
+  // Register list-templates command
+  prog
+    .command(COMMANDS.LIST_TEMPLATES)
+    .description('List all available templates (alternative command)')
+    .option('--json', 'Output in JSON format')
+    .action((opts) => listTemplatesCommand(opts));
 
   return prog;
 }
