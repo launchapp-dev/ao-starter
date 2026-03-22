@@ -195,6 +195,196 @@ name = "my-python-app"
     });
   });
 
+  describe('detectBun', () => {
+    it('should detect Bun project with bun.lockb', async () => {
+      await fs.writeFile('bun.lockb', '');
+      await fs.writeFile('package.json', JSON.stringify({ name: 'my-bun-app' }));
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('bun');
+      expect(result.framework).toBe('Bun');
+      expect(result.buildTool).toBe('bun');
+      expect(result.indicators).toContain('bun.lockb');
+    });
+
+    it('should detect Bun project with bunfig.toml', async () => {
+      await fs.writeFile('bunfig.toml', '');
+      await fs.writeFile('package.json', JSON.stringify({ name: 'my-bun-app' }));
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('bun');
+      expect(result.framework).toBe('Bun');
+      expect(result.buildTool).toBe('bun');
+      expect(result.indicators).toContain('bunfig.toml');
+    });
+
+    it('should detect Bun project with both bun.lockb and bunfig.toml', async () => {
+      await fs.writeFile('bun.lockb', '');
+      await fs.writeFile('bunfig.toml', '');
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('bun');
+      expect(result.indicators).toContain('bun.lockb');
+      expect(result.indicators).toContain('bunfig.toml');
+    });
+
+    it('should detect Bun project without package.json', async () => {
+      await fs.writeFile('bun.lockb', '');
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('bun');
+      expect(result.confidence).toBe(70);
+    });
+  });
+
+  describe('detectDeno', () => {
+    it('should detect Deno project with deno.json', async () => {
+      await fs.writeFile('deno.json', JSON.stringify({
+        name: 'my-deno-app',
+        tasks: { dev: 'deno run --watch server.ts' }
+      }));
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('deno');
+      expect(result.framework).toBe('Deno');
+      expect(result.rootPackage).toBe('my-deno-app');
+      expect(result.buildTool).toBe('deno');
+      expect(result.indicators).toContain('deno.json');
+    });
+
+    it('should detect Deno project with deno.jsonc', async () => {
+      await fs.writeFile('deno.jsonc', JSON.stringify({
+        name: 'my-deno-app',
+        tasks: { start: 'deno run server.ts' }
+      }));
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('deno');
+      expect(result.framework).toBe('Deno');
+      expect(result.indicators).toContain('deno.jsonc');
+    });
+
+    it('should handle deno.jsonc with comments', async () => {
+      await fs.writeFile('deno.jsonc', `{
+        // This is a comment
+        "name": "my-deno-app"
+      }`);
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('deno');
+      expect(result.rootPackage).toBe('my-deno-app');
+    });
+  });
+
+  describe('detectGo', () => {
+    it('should detect Go project', async () => {
+      await fs.writeFile('go.mod', `module github.com/user/my-go-app
+
+go 1.21`);
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('go');
+      expect(result.framework).toBe('Go');
+      expect(result.rootPackage).toBe('github.com/user/my-go-app');
+      expect(result.buildTool).toBe('go');
+      expect(result.indicators).toContain('go.mod');
+    });
+
+    it('should detect Go project with different module paths', async () => {
+      await fs.writeFile('go.mod', `module example.com/myproject
+
+go 1.20`);
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('go');
+      expect(result.rootPackage).toBe('example.com/myproject');
+    });
+
+    it('should detect Go project without module declaration', async () => {
+      await fs.writeFile('go.mod', `go 1.21`);
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('go');
+      expect(result.rootPackage).toBeUndefined();
+    });
+  });
+
+  describe('detectElixir', () => {
+    it('should detect Elixir project', async () => {
+      await fs.writeFile('mix.exs', `defmodule MyApp.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :my_app,
+      version: "0.1.0",
+      elixir: "~> 1.14"
+    ]
+  end
+end`);
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('elixir');
+      expect(result.framework).toBe('Elixir');
+      expect(result.rootPackage).toBe('my_app');
+      expect(result.buildTool).toBe('mix');
+      expect(result.indicators).toContain('mix.exs');
+    });
+
+    it('should detect Elixir project with underscore name', async () => {
+      await fs.writeFile('mix.exs', `defmodule MyProject.MixProject do
+  use Mix.Project
+
+  def project do
+    [
+      app: :my_project,
+      version: "1.0.0"
+    ]
+  end
+end`);
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('elixir');
+      expect(result.rootPackage).toBe('my_project');
+    });
+
+    it('should detect Elixir project without app name', async () => {
+      await fs.writeFile('mix.exs', `defmodule MyApp.MixProject do
+  use Mix.Project
+end`);
+
+      const detector = new ProjectDetector(tempDir);
+      const result = await detector.detect();
+
+      expect(result.type).toBe('elixir');
+      expect(result.rootPackage).toBeUndefined();
+    });
+  });
+
   describe('unknown project', () => {
     it('should return unknown for empty directory', async () => {
       const detector = new ProjectDetector(tempDir);
