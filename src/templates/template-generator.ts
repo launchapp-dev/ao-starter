@@ -45,7 +45,11 @@ export class TemplateGenerator {
     return createdFiles;
   }
 
-  private getFilesForProjectType(projectType: string): Array<{ template: string; outputPath: string }> {
+  /**
+   * Get the list of files that would be generated for a project type.
+   * Exposed for use by other modules (e.g., init command) to check for existing files.
+   */
+  public getFilesForProjectType(projectType: string): Array<{ template: string; outputPath: string }> {
     const baseFiles = [
       { template: 'custom.yaml.hbs', outputPath: 'custom.yaml' },
       { template: 'agents.yaml.hbs', outputPath: 'agents.yaml' },
