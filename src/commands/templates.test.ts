@@ -31,6 +31,56 @@ describe('templates', () => {
         expect(Array.isArray(template.suitableFor)).toBe(true);
       });
     });
+
+    it('should include bun, deno, elixir, and go templates', () => {
+      const templates = getAvailableTemplates();
+      const templateIds = templates.map((t) => t.id);
+
+      expect(templateIds).toContain('bun');
+      expect(templateIds).toContain('deno');
+      expect(templateIds).toContain('elixir');
+      expect(templateIds).toContain('go');
+    });
+
+    it('should have correct metadata for bun template', () => {
+      const template = getTemplateById('bun');
+      expect(template).toBeDefined();
+      expect(template?.name).toBe('Bun');
+      expect(template?.description).toContain('Bun');
+      expect(template?.isDefault).toBe(false);
+      expect(Array.isArray(template?.suitableFor)).toBe(true);
+      expect(template?.suitableFor.length).toBeGreaterThan(0);
+    });
+
+    it('should have correct metadata for deno template', () => {
+      const template = getTemplateById('deno');
+      expect(template).toBeDefined();
+      expect(template?.name).toBe('Deno');
+      expect(template?.description).toContain('Deno');
+      expect(template?.isDefault).toBe(false);
+      expect(Array.isArray(template?.suitableFor)).toBe(true);
+      expect(template?.suitableFor.length).toBeGreaterThan(0);
+    });
+
+    it('should have correct metadata for elixir template', () => {
+      const template = getTemplateById('elixir');
+      expect(template).toBeDefined();
+      expect(template?.name).toBe('Elixir');
+      expect(template?.description).toContain('Elixir');
+      expect(template?.isDefault).toBe(false);
+      expect(Array.isArray(template?.suitableFor)).toBe(true);
+      expect(template?.suitableFor.length).toBeGreaterThan(0);
+    });
+
+    it('should have correct metadata for go template', () => {
+      const template = getTemplateById('go');
+      expect(template).toBeDefined();
+      expect(template?.name).toBe('Go');
+      expect(template?.description).toContain('Go');
+      expect(template?.isDefault).toBe(false);
+      expect(Array.isArray(template?.suitableFor)).toBe(true);
+      expect(template?.suitableFor.length).toBeGreaterThan(0);
+    });
   });
 
   describe('getTemplateById', () => {

@@ -74,6 +74,38 @@ describe('TemplateGenerator', () => {
       expect(files.map((f) => f.outputPath)).toContain('agents-python.yaml');
       expect(files.map((f) => f.outputPath)).toContain('phases-python.yaml');
     });
+
+    it('should return Bun files for bun project type', () => {
+      const files = generator.getFilesForProjectType('bun');
+      
+      expect(files).toHaveLength(6);
+      expect(files.map((f) => f.outputPath)).toContain('agents-bun.yaml');
+      expect(files.map((f) => f.outputPath)).toContain('phases-bun.yaml');
+    });
+
+    it('should return Deno files for deno project type', () => {
+      const files = generator.getFilesForProjectType('deno');
+      
+      expect(files).toHaveLength(6);
+      expect(files.map((f) => f.outputPath)).toContain('agents-deno.yaml');
+      expect(files.map((f) => f.outputPath)).toContain('phases-deno.yaml');
+    });
+
+    it('should return Elixir files for elixir project type', () => {
+      const files = generator.getFilesForProjectType('elixir');
+      
+      expect(files).toHaveLength(6);
+      expect(files.map((f) => f.outputPath)).toContain('agents-elixir.yaml');
+      expect(files.map((f) => f.outputPath)).toContain('phases-elixir.yaml');
+    });
+
+    it('should return Go files for go project type', () => {
+      const files = generator.getFilesForProjectType('go');
+      
+      expect(files).toHaveLength(6);
+      expect(files.map((f) => f.outputPath)).toContain('agents-go.yaml');
+      expect(files.map((f) => f.outputPath)).toContain('phases-go.yaml');
+    });
   });
 
   describe('generate', () => {
