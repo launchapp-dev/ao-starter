@@ -1,4 +1,15 @@
 import chalk from 'chalk';
+import { setLoggerConfig, logger } from '../utils/logger.js';
+
+/**
+ * CLI options for the templates command
+ */
+export interface TemplatesOptions {
+  /** Suppress progress messages, only show errors and final result */
+  quiet?: boolean;
+  /** Show detailed step-by-step output */
+  verbose?: boolean;
+}
 
 /**
  * Template information for display
@@ -130,26 +141,44 @@ export function isValidTemplateId(id: string): boolean {
 /**
  * List all available templates with formatted output
  */
-export function listTemplates(): void {
-  console.log(chalk.bold('\n📦 Available Templates\n'));
+export function listTemplates(options?: TemplatesOptions): void {
+  // Configure logger based on options
+  if (options) {
+    setLoggerConfig({
+      quiet: options.quiet ?? false,
+      verbose: options.verbose ?? false,
+    });
+  }
+
+  logger.banner(chalk.bold('\n📦 Available Templates\n'));
 
   // Find the longest name for alignment
   const maxNameLength = Math.max(...AVAILABLE_TEMPLATES.map((t) => t.id.length));
+
+  // Verbose: Show template enumeration
+  logger.debug(`Found ${AVAILABLE_TEMPLATES.length} available templates`);
 
   for (const template of AVAILABLE_TEMPLATES) {
     const padding = ' '.repeat(maxNameLength - template.id.length + 2);
     const defaultBadge = template.isDefault ? chalk.gray(' (default)') : '';
 
-    console.log(`  ${chalk.cyan(template.id)}${padding}${template.description}${defaultBadge}`);
+    logger.info(`  ${chalk.cyan(template.id)}${padding}${template.description}${defaultBadge}`);
 
     // Print suitable for
     console.log(chalk.gray(`    Suitable for: ${template.suitableFor.join(', ')}`));
     console.log();
+
+    // Verbose: Show additional template details
+    if (logger.isVerbose()) {
+      logger.detection(`Template: ${template.id} (confidence: ${template.isDefault ? 'default' : 'optional'})`);
+    }
   }
 
-  console.log(chalk.gray('Usage:'));
-  console.log(chalk.gray(`  ${chalk.cyan('ao init')} ${chalk.gray('--template <template-id>')}`));
-  console.log();
+  if (!logger.isQuiet()) {
+    console.log(chalk.gray('Usage:'));
+    console.log(chalk.gray(`  ${chalk.cyan('ao init')} ${chalk.gray('--template <template-id>')}`));
+    console.log();
+  }
 
   // Show current detected project recommendation
   showTemplateRecommendation();

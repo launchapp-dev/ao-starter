@@ -100,19 +100,43 @@ For more information, see https://github.com/launchapp-dev/ao-starter`
     .command(COMMANDS.DETECT)
     .description('Detect project type and show recommendations')
     .option('--json', 'Output in JSON format')
+    .option(
+      '-q, --quiet',
+      'Suppress progress messages, only show errors and final result'
+    )
+    .option(
+      '-v, --verbose',
+      'Show detailed step-by-step output during detection'
+    )
     .action(detectCommand);
 
   // Register templates command
   prog
     .command(COMMANDS.TEMPLATES)
     .description('List all available templates with their descriptions')
-    .action(listTemplates);
+    .option(
+      '-q, --quiet',
+      'Suppress progress messages, only show errors and final result'
+    )
+    .option(
+      '-v, --verbose',
+      'Show detailed step-by-step output'
+    )
+    .action((opts) => listTemplates(opts));
 
   // Register list-templates command
   prog
     .command(COMMANDS.LIST_TEMPLATES)
     .description('List all available templates (alternative command)')
     .option('--json', 'Output in JSON format')
+    .option(
+      '-q, --quiet',
+      'Suppress progress messages, only show errors and final result'
+    )
+    .option(
+      '-v, --verbose',
+      'Show detailed step-by-step output'
+    )
     .action((opts) => listTemplatesCommand(opts));
 
   return prog;

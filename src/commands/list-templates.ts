@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import { TemplateGenerator } from '../templates/template-generator.js';
+import { setLoggerConfig, logger } from '../utils/logger.js';
 
 /**
  * Known template types that can be enumerated via getFilesForProjectType()
@@ -91,6 +92,10 @@ const TEMPLATE_METADATA: Record<string, { name: string; description: string; sui
 export interface ListTemplatesOptions {
   /** Output in JSON format */
   json?: boolean;
+  /** Suppress progress messages, only show errors and final result */
+  quiet?: boolean;
+  /** Show detailed step-by-step output */
+  verbose?: boolean;
 }
 
 /**
@@ -98,8 +103,19 @@ export interface ListTemplatesOptions {
  * Uses TemplateGenerator.getFilesForProjectType() to enumerate templates
  */
 export function listTemplatesCommand(options?: ListTemplatesOptions): void {
+  // Configure logger based on options
+  if (options) {
+    setLoggerConfig({
+      quiet: options.quiet ?? false,
+      verbose: options.verbose ?? false,
+    });
+  }
+
   const generator = new TemplateGenerator();
   const templates: TemplateInfo[] = [];
+
+  // Verbose: Show template enumeration step
+  logger.step(1, 2, 'Enumerating available templates...');
 
   // Enumerate all templates using getFilesForProjectType()
   for (const templateType of TEMPLATE_TYPES) {
@@ -114,7 +130,12 @@ export function listTemplatesCommand(options?: ListTemplatesOptions): void {
       files: files.map((f) => f.outputPath),
       isDefault: templateType === 'default',
     });
+
+    // Verbose: Log each template
+    logger.detection(`Found template: ${templateType} (${files.length} files)`);
   }
+
+  logger.step(2, 2, 'Displaying templates');
 
   if (options?.json) {
     console.log(JSON.stringify(templates, null, 2));
@@ -129,7 +150,7 @@ export function listTemplatesCommand(options?: ListTemplatesOptions): void {
  * Display templates in a formatted table
  */
 function displayTemplates(templates: TemplateInfo[]): void {
-  console.log(chalk.bold('\n📦 Available Templates\n'));
+  logger.banner(chalk.bold('\n📦 Available Templates\n'));
 
   // Find the longest ID for alignment
   const maxIdLength = Math.max(...templates.map((t) => t.id.length));
@@ -138,17 +159,19 @@ function displayTemplates(templates: TemplateInfo[]): void {
     const padding = ' '.repeat(maxIdLength - template.id.length + 2);
     const defaultBadge = template.isDefault ? chalk.gray(' (default)') : '';
 
-    console.log(`  ${chalk.cyan(template.id)}${padding}${template.description}${defaultBadge}`);
+    logger.info(`  ${chalk.cyan(template.id)}${padding}${template.description}${defaultBadge}`);
     console.log(chalk.gray(`    Suitable for: ${template.suitableFor.join(', ')}`));
     console.log(chalk.gray(`    Generates: ${template.files.length} files`));
     console.log();
   }
 
   // Usage hint
-  console.log(chalk.gray('Usage:'));
-  console.log(chalk.gray(`  ${chalk.cyan('ao init')} ${chalk.gray('--template <template-id>')}`));
-  console.log(chalk.gray(`  ${chalk.cyan('ao list-templates --json')} ${chalk.gray('# For machine-readable output')}`));
-  console.log();
+  if (!logger.isQuiet()) {
+    console.log(chalk.gray('Usage:'));
+    console.log(chalk.gray(`  ${chalk.cyan('ao init')} ${chalk.gray('--template <template-id>')}`));
+    console.log(chalk.gray(`  ${chalk.cyan('ao list-templates --json')} ${chalk.gray('# For machine-readable output')}`));
+    console.log();
+  }
 }
 
 /**

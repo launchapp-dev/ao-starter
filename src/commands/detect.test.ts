@@ -119,7 +119,7 @@ members = ["crate-a", "crate-b"]
       expect(allOutput).toContain('typescript');
       expect(allOutput).toContain('Language:');
       expect(allOutput).toContain('TypeScript');
-      expect(allOutput).toContain('create-ao init');
+      expect(allOutput).toContain('ao init');
     });
 
     it('should show framework when detected for Next.js', async () => {
@@ -172,7 +172,7 @@ go 1.21`);
       const allOutput = logOutput.join('\n');
       expect(allOutput).toContain('Recommendations:');
       expect(allOutput).toContain('1.');
-      expect(allOutput).toContain('create-ao init');
+      expect(allOutput).toContain('ao init');
     });
 
     it('should show recommendations section for detected project with suggestions', async () => {
