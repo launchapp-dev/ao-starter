@@ -35,7 +35,7 @@ agents:
       Use merge_pull_request MCP tool to merge good PRs.
       Close conflicting PRs after 3 failed rebases.
     model: minimax/MiniMax-M2.7
-    tool: oai-runner
+    tool: claude
     mcp_servers: ["ao", "github"]
 
   planner:
@@ -44,7 +44,7 @@ agents:
       Check ao.queue.list — max 3 items. Check open PRs — pause at 5+.
       Read VISION.md and requirements before creating tasks.
     model: minimax/MiniMax-M2.7
-    tool: oai-runner
+    tool: claude
     mcp_servers: ["ao"]
 
   product-owner:
@@ -53,7 +53,7 @@ agents:
       Read VISION.md every run. Create requirements and tasks.
       NEVER remove features. Only ADD and IMPROVE.
     model: minimax/MiniMax-M2.7
-    tool: oai-runner
+    tool: claude
     mcp_servers: ["ao", "github"]
 
 phases:
