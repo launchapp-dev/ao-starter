@@ -656,6 +656,159 @@ version = "0.1.0"`);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('detect');
       expect(result.stdout).toContain('--json');
+      expect(result.stdout).toContain('--quiet');
+      expect(result.stdout).toContain('--verbose');
+    });
+  });
+
+  describe('ao templates --help', () => {
+    it('should display help for templates command', async () => {
+      const result = await runCli(['templates', '--help']);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('templates');
+      expect(result.stdout).toContain('--quiet');
+      expect(result.stdout).toContain('--verbose');
+    });
+  });
+
+  describe('ao list-templates --help', () => {
+    it('should display help for list-templates command', async () => {
+      const result = await runCli(['list-templates', '--help']);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('list-templates');
+      expect(result.stdout).toContain('--json');
+      expect(result.stdout).toContain('--quiet');
+      expect(result.stdout).toContain('--verbose');
+    });
+  });
+
+  describe('ao --quiet flag', () => {
+    it('should suppress output on init except errors and result', async () => {
+      const result = await runCli(['init', '--skip-detect', '--quiet']);
+
+      expect(result.exitCode).toBe(0);
+      // Should not contain progress messages
+      expect(result.stdout).not.toContain('Initializing AO workflows');
+      expect(result.stdout).not.toContain('Created AO workflow files');
+      // Should contain the final result
+      expect(result.stdout).toContain('initialized successfully');
+      // Should not contain verbose indicators
+      expect(result.stdout).not.toContain('[debug]');
+    });
+
+    it('should suppress output on detect except errors and result', async () => {
+      await fs.writeJson('package.json', { name: 'test-project' });
+      await fs.writeJson('tsconfig.json', { compilerOptions: {} });
+
+      const result = await runCli(['detect', '--quiet']);
+
+      expect(result.exitCode).toBe(0);
+      // Should not contain progress messages
+      expect(result.stdout).not.toContain('Analyzing project');
+      expect(result.stdout).not.toContain('Project Detection Results');
+      // Should contain the final result (type)
+      expect(result.stdout).toContain('typescript');
+      // Should not contain verbose indicators
+      expect(result.stdout).not.toContain('[debug]');
+    });
+
+    it('should still show errors in quiet mode', async () => {
+      const result = await runCli(['init', '--output', '/nonexistent/path', '--quiet']);
+
+      expect(result.exitCode).not.toBe(0);
+      // Error should be shown
+      expect(result.stdout + result.stderr).toContain('ENOENT') ||
+        expect(result.stdout + result.stderr).toContain('Error');
+    });
+
+    it('should suppress output on templates in quiet mode', async () => {
+      const result = await runCli(['templates', '--quiet']);
+
+      expect(result.exitCode).toBe(0);
+      // Should not contain banner
+      expect(result.stdout).not.toContain('Available Templates');
+      // Should not contain verbose indicators
+      expect(result.stdout).not.toContain('[debug]');
+    });
+
+    it('should suppress output on list-templates in quiet mode', async () => {
+      const result = await runCli(['list-templates', '--quiet']);
+
+      expect(result.exitCode).toBe(0);
+      // Should not contain banner
+      expect(result.stdout).not.toContain('Available Templates');
+      // Should not contain verbose indicators
+      expect(result.stdout).not.toContain('[debug]');
+    });
+  });
+
+  describe('ao --verbose flag', () => {
+    it('should show debug output on init with verbose flag', async () => {
+      const result = await runCli(['init', '--skip-detect', '--verbose']);
+
+      expect(result.exitCode).toBe(0);
+      // Should contain verbose indicators
+      expect(result.stdout).toContain('[debug]') || result.stdout.includes('Configuration:');
+      expect(result.stdout).toContain('[generation]');
+      // Should contain detailed output
+      expect(result.stdout).toContain('Initializing AO workflows');
+    });
+
+    it('should show step progress on detect with verbose flag', async () => {
+      await fs.writeJson('package.json', { name: 'test-project' });
+      await fs.writeJson('tsconfig.json', { compilerOptions: {} });
+
+      const result = await runCli(['detect', '--verbose']);
+
+      expect(result.exitCode).toBe(0);
+      // Should contain step indicators
+      expect(result.stdout).toContain('[1/3]') || result.stdout.includes('[2/3]') || result.stdout.includes('[3/3]');
+      expect(result.stdout).toContain('Scanning project files') || result.stdout.includes('Analyzing detection');
+      // Should contain detection details
+      expect(result.stdout).toContain('[detection]');
+    });
+
+    it('should show verbose output on templates with verbose flag', async () => {
+      const result = await runCli(['templates', '--verbose']);
+
+      expect(result.exitCode).toBe(0);
+      // Should contain debug indicators
+      expect(result.stdout).toContain('[debug]');
+      expect(result.stdout).toContain('Found');
+      expect(result.stdout).toContain('available templates');
+    });
+
+    it('should show verbose output on list-templates with verbose flag', async () => {
+      const result = await runCli(['list-templates', '--verbose']);
+
+      expect(result.exitCode).toBe(0);
+      // Should contain step and detection indicators
+      expect(result.stdout).toContain('[1/2]') || result.stdout.includes('[2/2]');
+      expect(result.stdout).toContain('[detection]');
+      expect(result.stdout).toContain('Found template:');
+    });
+
+    it('should show verbose detection details with indicators', async () => {
+      await fs.writeJson('package.json', { name: 'test-ts-project' });
+      await fs.writeJson('tsconfig.json', { compilerOptions: {} });
+
+      const result = await runCli(['detect', '--verbose']);
+
+      expect(result.exitCode).toBe(0);
+      // Should show file indicators in verbose mode
+      expect(result.stdout).toContain('[detection]');
+      expect(result.stdout).toContain('File indicators found:');
+    });
+
+    it('should show generation steps in verbose mode', async () => {
+      const result = await runCli(['init', '--skip-detect', '--verbose']);
+
+      expect(result.exitCode).toBe(0);
+      // Should show generation messages
+      expect(result.stdout).toContain('[generation]');
+      expect(result.stdout).toContain('Generating');
     });
   });
 

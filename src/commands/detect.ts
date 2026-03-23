@@ -1,11 +1,29 @@
 import chalk from 'chalk';
 import { ProjectDetector } from '../detectors/project-detector.js';
+import { setLoggerConfig, logger } from '../utils/logger.js';
 
+/**
+ * CLI options for the detect command
+ */
 export interface DetectOptions {
+  /** Output in JSON format */
   json?: boolean;
+  /** Suppress progress messages, only show errors and final result */
+  quiet?: boolean;
+  /** Show detailed step-by-step output during detection */
+  verbose?: boolean;
 }
 
+/**
+ * Detect command implementation
+ */
 export async function detectCommand(options: DetectOptions): Promise<void> {
+  // Configure logger based on options
+  setLoggerConfig({
+    quiet: options.quiet ?? false,
+    verbose: options.verbose ?? false,
+  });
+
   if (options.json) {
     await detectJson();
   } else {
@@ -14,13 +32,21 @@ export async function detectCommand(options: DetectOptions): Promise<void> {
 }
 
 async function detectHuman(): Promise<void> {
-  console.log(chalk.cyan('Analyzing project...\n'));
+  logger.banner(chalk.cyan('Analyzing project...\n'));
 
   try {
     const detector = new ProjectDetector();
+
+    // Verbose: Show detection step
+    logger.step(1, 3, 'Scanning project files...');
+
     const detection = await detector.detect();
 
-    console.log(chalk.bold('Project Detection Results:\n'));
+    // Verbose: Show analysis complete
+    logger.step(2, 3, 'Analyzing detection results...');
+
+    logger.banner(chalk.bold('Project Detection Results:\n'));
+
     console.log(`  ${chalk.gray('Type:')}      ${chalk.white(detection.type || 'Unknown')}`);
 
     if (detection.framework) {
@@ -52,18 +78,32 @@ async function detectHuman(): Promise<void> {
 
     console.log();
 
+    // Verbose: Show indicators
+    if (logger.isVerbose() && detection.indicators && detection.indicators.length > 0) {
+      logger.detection('File indicators found:');
+      detection.indicators.forEach((indicator) => {
+        logger.list(indicator);
+      });
+      console.log();
+    }
+
     if (detection.recommendations && detection.recommendations.length > 0) {
-      console.log(chalk.bold('Recommendations:\n'));
+      logger.banner(chalk.bold('Recommendations:\n'));
       detection.recommendations.forEach((rec, i) => {
         console.log(`  ${i + 1}. ${rec}`);
       });
       console.log();
     }
 
-    console.log(chalk.gray(`Run ${chalk.cyan('create-ao init')} to generate AO workflow files.\n`));
+    // Verbose: Show final step
+    logger.step(3, 3, 'Detection complete');
+
+    if (!logger.isQuiet()) {
+      console.log(chalk.gray(`Run ${chalk.cyan('ao init')} to generate AO workflow files.\n`));
+    }
   } catch (error) {
-    console.error(chalk.red('Error detecting project:'));
-    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+    logger.error('Error detecting project:');
+    logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
@@ -74,8 +114,8 @@ async function detectJson(): Promise<void> {
     const detection = await detector.detect();
     console.log(JSON.stringify(detection, null, 2));
   } catch (error) {
-    console.error(chalk.red('Error detecting project:'));
-    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+    logger.error('Error detecting project:');
+    logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
