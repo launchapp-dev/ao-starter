@@ -41,4 +41,8 @@ describe('prompts utilities', () => {
       expect(result).toContain('(default)');
     });
   });
+
+  // Note: Interactive prompt tests (confirmProjectType, promptOutputDirectory, confirmOverwrite)
+  // require mocking Enquirer or a TTY environment. These are tested through integration tests
+  // in the init.test.ts file which test the full interactive flow.
 });

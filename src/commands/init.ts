@@ -5,7 +5,13 @@ import { ProjectDetector } from '../detectors/project-detector.js';
 import { TemplateGenerator } from '../templates/template-generator.js';
 import { isValidTemplateId, getTemplateById, getAvailableTemplates, listTemplates } from './templates.js';
 import { setLoggerConfig, logger } from '../utils/logger.js';
-import { selectTemplateInteractive, isInteractiveTerminal } from '../utils/prompts.js';
+import {
+  selectTemplateInteractive,
+  isInteractiveTerminal,
+  confirmProjectType,
+  promptOutputDirectory,
+  confirmOverwrite,
+} from '../utils/prompts.js';
 import type { ErrnoException } from '../types/index.js';
 
 /**
@@ -208,80 +214,59 @@ export async function initCommand(options: initOptions): Promise<void> {
   // Banner - shown in normal and verbose modes
   logger.banner(chalk.cyan('Initializing AO workflows...\n'));
 
-  const outputDir = path.resolve(options.output);
+  // Determine if we're in interactive mode
+  const interactive = isInteractiveTerminal() && !options.yes;
+  const detectedOutputDir = path.resolve(options.output);
+  let effectiveOutputDir = detectedOutputDir;
+
+  // Store validated template (command line) - will be used later in try block
+  const validatedTemplate = options.template;
+  let templateId: string | undefined;
+  let templateName: string;
 
   try {
-    // Validate template if provided
-    let templateId = validateTemplate(options.template);
-    let templateName = getTemplateDisplayName(templateId);
+    // Validate template if provided (command line)
+    templateId = validateTemplate(validatedTemplate);
+    templateName = getTemplateDisplayName(templateId);
 
     // Verbose: Show configuration details
     logger.debug('Configuration:', {
-      output: outputDir,
+      output: effectiveOutputDir,
       template: templateId || 'auto-detect',
       dryRun: options.dryRun,
       force: options.force,
       quiet: options.quiet,
       verbose: options.verbose,
+      interactive,
     });
 
-    // Check for empty output directory
-    if (outputDir !== path.resolve(process.cwd())) {
-      try {
-        const stats = await fs.stat(outputDir);
-        if (stats.isDirectory()) {
-          const files = await fs.readdir(outputDir);
-          // Only warn if directory exists but is empty AND we're in dry-run mode
-          // (empty directory is fine for generation)
-          if (files.length === 0 && !options.dryRun) {
-            logger.info(chalk.yellow(`Note: Output directory "${outputDir}" is empty.\n`));
-          }
-        }
-      } catch {
-        // Directory doesn't exist yet, which is fine (fs-extra.ensureDir will create it)
-      }
-    }
-
-    // Check write permissions if directory exists
-    await checkWritePermission(outputDir);
-
-    // Check for existing files (only in non-dry-run mode and non-force mode)
-    const effectiveProjectType = templateId || 'default';
-    if (!options.dryRun && !options.force) {
-      const existingFiles = await checkExistingFiles(outputDir, effectiveProjectType);
-      if (existingFiles.length > 0) {
-        logger.warn('The following files already exist and will be overwritten:\n');
-        existingFiles.forEach((file) => {
-          logger.list(file);
-        });
-        console.log();
-      }
-    }
-
-    let projectType = templateId;
-
-    // Auto-detect project type first (before interactive selection)
+    // Step 1: Auto-detect project type (if not skipped and no template specified)
     let detectedType: string | undefined;
-    if (!options.skipDetect && !projectType && !options.force) {
+    let detectionConfidence = 0;
+    let detectedFramework: string | undefined;
+
+    if (!options.skipDetect && !options.force && !templateId) {
       logger.debug('Starting project type detection...');
 
       const detector = new ProjectDetector();
       const detection = await detector.detect();
       detectedType = detection.type;
+      detectionConfidence = detection.confidence;
+      detectedFramework = detection.framework;
 
       // Show detection info if applicable
-      if (!isInteractiveTerminal()) {
+      if (!interactive) {
         console.log(chalk.gray(`Detected project type: ${chalk.white(detectedType || 'unknown')}`));
       }
 
       // Verbose: Show detailed detection info
       if (options.verbose) {
         logger.detection(`Detected project type: ${detectedType || 'unknown'}`);
-        logger.debug('Detection confidence:', detection.confidence);
+        logger.debug('Detection confidence:', detectionConfidence);
 
-        if (detection.framework) {
-          logger.debug(`Framework: ${detection.framework}`);
-          logger.detection(`Framework: ${detection.framework}`);
+        if (detectedFramework) {
+          logger.debug(`Framework: ${detectedFramework}`);
+          logger.detection(`Framework: ${detectedFramework}`);
         }
 
         if (detection.indicators && detection.indicators.length > 0) {
@@ -293,27 +278,122 @@ export async function initCommand(options: initOptions): Promise<void> {
       }
     }
 
-    // If no template specified and not in force mode, show interactive selection
-    if (!projectType && !options.force && !options.template) {
-      // If we detected a type, show the prompt with recommendation
-      if (isInteractiveTerminal()) {
-        const interactiveTemplate = await getTemplateInteractively(detectedType);
+    // Step 2: Interactive prompts (only in interactive mode without --yes flag)
+    if (interactive && !templateId && !options.force) {
+      // 2a: Confirm project type if detected
+      if (detectedType && detectedType !== 'unknown') {
+        const typeResult = await confirmProjectType({
+          detectedType,
+          framework: detectedFramework,
+          confidence: detectionConfidence,
+        });
 
-        if (interactiveTemplate) {
-          projectType = interactiveTemplate;
-          templateName = getTemplateDisplayName(projectType);
-        } else {
-          // User cancelled - exit gracefully
-          console.log(chalk.gray('\nNo template selected. Run ') +
-            chalk.cyan('ao init --template <name>') +
-            chalk.gray(' to specify a template.'));
+        if (typeResult.cancelled) {
+          console.log(chalk.gray('\nOperation cancelled.'));
           return;
         }
-      } else if (detectedType && isValidTemplateId(detectedType)) {
-        // Non-interactive: use detected type if valid
-        projectType = detectedType;
-        templateName = getTemplateDisplayName(projectType);
+
+        if (typeResult.selectDifferent) {
+          // User wants to select a different template
+          const templateResult = await getTemplateInteractively(detectedType);
+          if (templateResult === undefined) {
+            console.log(chalk.gray('\nOperation cancelled.'));
+            return;
+          }
+          templateId = templateResult;
+          templateName = getTemplateDisplayName(templateId);
+        } else if (typeResult.confirmed && isValidTemplateId(detectedType)) {
+          // User confirmed the detected type
+          templateId = detectedType;
+          templateName = getTemplateDisplayName(templateId);
+        }
+        // If user chose "no, use default", templateId remains undefined (will use default)
+      } else {
+        // No detection, go straight to template selection
+        const templateResult = await getTemplateInteractively();
+        if (templateResult === undefined) {
+          console.log(chalk.gray('\nOperation cancelled.'));
+          return;
+        }
+        templateId = templateResult;
+        templateName = getTemplateDisplayName(templateId);
       }
+
+      // 2b: Prompt for output directory
+      const dirResult = await promptOutputDirectory({
+        defaultDirectory: effectiveOutputDir,
+      });
+
+      if (dirResult.cancelled) {
+        console.log(chalk.gray('\nOperation cancelled.'));
+        return;
+      }
+
+      effectiveOutputDir = dirResult.directory;
+
+      // Check write permissions for new directory
+      await checkWritePermission(effectiveOutputDir);
+    } else {
+      // Non-interactive or --yes mode: use default output directory
+      await checkWritePermission(effectiveOutputDir);
+    }
+
+    // Step 3: Check for existing files and prompt for overwrite confirmation
+    const effectiveProjectType = templateId || 'default';
+    if (!options.dryRun && !options.force) {
+      const existingFiles = await checkExistingFiles(effectiveOutputDir, effectiveProjectType);
+
+      if (existingFiles.length > 0) {
+        if (interactive && !options.yes) {
+          // Interactive overwrite confirmation
+          const overwriteResult = await confirmOverwrite({
+            files: existingFiles,
+            outputDir: effectiveOutputDir,
+          });
+
+          if (overwriteResult.cancelled) {
+            console.log(chalk.gray('\nOperation cancelled.'));
+            return;
+          }
+
+          if (!overwriteResult.proceed) {
+            console.log(chalk.gray('\nNo files were modified.'));
+            console.log(chalk.gray('Run ') +
+              chalk.cyan('ao init --force') +
+              chalk.gray(' to overwrite files without confirmation.'));
+            return;
+          }
+        } else {
+          // Non-interactive: just warn
+          logger.warn('The following files already exist and will be overwritten:\n');
+          existingFiles.forEach((file) => {
+            logger.list(file);
+          });
+          console.log();
+        }
+      }
+    }
+
+    // Step 4: If no template selected yet and not in force mode, use detected type or default
+    if (!templateId && !options.force) {
+      if (detectedType && isValidTemplateId(detectedType)) {
+        templateId = detectedType;
+        templateName = getTemplateDisplayName(templateId);
+      } else {
+        templateId = 'default';
+        templateName = getTemplateDisplayName(templateId);
+      }
+    }
+
+    // Handle force mode
+    if (options.force && !templateId) {
+      templateId = 'default';
+      templateName = getTemplateDisplayName(templateId);
+      logger.info(chalk.yellow('Note: --force bypasses auto-detection, using default template'));
+      console.log();
+    } else if (options.force && templateId) {
+      logger.info(chalk.gray(`Using specified template: ${chalk.white(templateId)}`));
+      console.log();
     }
 
     // Show template selection
@@ -322,25 +402,14 @@ export async function initCommand(options: initOptions): Promise<void> {
       logger.info(chalk.yellow('Mode: Dry run (no files will be written)\n'));
     }
 
-    // Handle force mode
-    if (options.force && !projectType) {
-      projectType = 'default';
-      templateName = getTemplateDisplayName(projectType);
-      logger.info(chalk.yellow('Note: --force bypasses auto-detection, using default template'));
-      console.log();
-    } else if (options.force && projectType) {
-      logger.info(chalk.gray(`Using specified template: ${chalk.white(projectType)}`));
-      console.log();
-    }
-
     // Verbose: Show generation step
-    logger.generation(`Generating ${projectType || 'default'} templates...`);
+    logger.generation(`Generating ${templateId || 'default'} templates...`);
 
     // Generate templates
     const generator = new TemplateGenerator();
     const files = await generator.generate({
-      projectType: projectType || 'default',
-      outputDir,
+      projectType: templateId || 'default',
+      outputDir: effectiveOutputDir,
       dryRun: options.dryRun,
     });
 
