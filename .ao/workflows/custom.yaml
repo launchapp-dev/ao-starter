@@ -16,7 +16,7 @@ mcp_servers:
 
 agents:
   default:
-    model: kimi-for-coding
+    model: kimi-code/kimi-for-coding
     tool: claude
 
   implementer:
@@ -24,7 +24,7 @@ agents:
       You implement code for ao-starter. Build the create-ao CLI scaffolder.
       Write clean TypeScript. Follow existing patterns.
       Commit with descriptive messages. Do not add yourself as author.
-    model: kimi-for-coding
+    model: kimi-code/kimi-for-coding
     tool: claude
     mcp_servers: ["ao", "context7"]
 
@@ -43,7 +43,7 @@ agents:
       You plan work for ao-starter. Build a CLI that generates AO workflow configs for any project type (TypeScript monorepo, Rust, Python).
       Check ao.queue.list — max 3 items. Check open PRs — pause at 5+.
       Read VISION.md and requirements before creating tasks.
-    model: minimax/MiniMax-M2.7
+    model: claude-haiku-4-5
     tool: claude
     mcp_servers: ["ao"]
 
