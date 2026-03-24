@@ -16,7 +16,7 @@ mcp_servers:
 
 agents:
   default:
-    model: kimi-code/kimi-for-coding
+    model: kimi-for-coding
     tool: claude
 
   implementer:
@@ -24,7 +24,7 @@ agents:
       You implement code for ao-starter. Build the create-ao CLI scaffolder.
       Write clean TypeScript. Follow existing patterns.
       Commit with descriptive messages. Do not add yourself as author.
-    model: kimi-code/kimi-for-coding
+    model: kimi-for-coding
     tool: claude
     mcp_servers: ["ao", "context7"]
 
