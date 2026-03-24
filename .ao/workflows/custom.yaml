@@ -17,7 +17,7 @@ mcp_servers:
 agents:
   default:
     model: kimi-code/kimi-for-coding
-    tool: oai-runner
+    tool: claude
 
   implementer:
     system_prompt: |
@@ -25,7 +25,7 @@ agents:
       Write clean TypeScript. Follow existing patterns.
       Commit with descriptive messages. Do not add yourself as author.
     model: kimi-code/kimi-for-coding
-    tool: oai-runner
+    tool: claude
     mcp_servers: ["ao", "context7"]
 
   reviewer:
