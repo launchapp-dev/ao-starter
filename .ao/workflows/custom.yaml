@@ -17,7 +17,7 @@ mcp_servers:
 agents:
   default:
     model: kimi-code/kimi-for-coding
-    tool: oai-runner
+    tool: claude
 
   implementer:
     system_prompt: |
@@ -25,7 +25,7 @@ agents:
       Write clean TypeScript. Follow existing patterns.
       Commit with descriptive messages. Do not add yourself as author.
     model: kimi-code/kimi-for-coding
-    tool: oai-runner
+    tool: claude
     mcp_servers: ["ao", "context7"]
 
   reviewer:
@@ -35,7 +35,7 @@ agents:
       Use merge_pull_request MCP tool to merge good PRs.
       Close conflicting PRs after 3 failed rebases.
     model: minimax/MiniMax-M2.7
-    tool: oai-runner
+    tool: claude
     mcp_servers: ["ao", "github"]
 
   planner:
@@ -43,8 +43,8 @@ agents:
       You plan work for ao-starter. Build a CLI that generates AO workflow configs for any project type (TypeScript monorepo, Rust, Python).
       Check ao.queue.list — max 3 items. Check open PRs — pause at 5+.
       Read VISION.md and requirements before creating tasks.
-    model: minimax/MiniMax-M2.7
-    tool: oai-runner
+    model: claude-haiku-4-5
+    tool: claude
     mcp_servers: ["ao"]
 
   product-owner:
@@ -53,7 +53,7 @@ agents:
       Read VISION.md every run. Create requirements and tasks.
       NEVER remove features. Only ADD and IMPROVE.
     model: minimax/MiniMax-M2.7
-    tool: oai-runner
+    tool: claude
     mcp_servers: ["ao", "github"]
 
 phases:
