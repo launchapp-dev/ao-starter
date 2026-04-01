@@ -115,6 +115,13 @@ const AVAILABLE_TEMPLATES: TemplateInfo[] = [
     suitableFor: ['Go projects', 'CLI tools', 'Network services'],
     isDefault: false,
   },
+  {
+    id: 'mcp-server-http',
+    name: 'MCP Server (HTTP)',
+    description: 'MCP server workflows with StreamableHTTP/SSE transport, tool validation, and protocol compliance',
+    suitableFor: ['MCP servers', 'Claude integrations', 'AI tool servers', 'HTTP MCP transport'],
+    isDefault: false,
+  },
 ];
 
 /**

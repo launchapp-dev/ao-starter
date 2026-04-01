@@ -17,6 +17,7 @@ export type ProjectType =
   | 'deno'
   | 'go'
   | 'elixir'
+  | 'mcp-server-http'
   | 'unknown';
 
 /**
