@@ -37,6 +37,7 @@ export class ProjectDetector {
     const detectors = [
       this.detectTypeScriptMonorepo.bind(this),
       this.detectNextJs.bind(this),
+      this.detectMcpServerHttp.bind(this),
       this.detectRustWorkspace.bind(this),
       this.detectRustSingle.bind(this),
       this.detectPython.bind(this),
@@ -206,6 +207,73 @@ export class ProjectDetector {
         hasTsconfig ? 'tsconfig.json' : 'package.json (next dependency)',
       ].filter(Boolean) as string[],
     };
+  }
+
+  /**
+   * Detect MCP HTTP server: package.json with @modelcontextprotocol/sdk + HTTP transport indicators
+   */
+  private async detectMcpServerHttp(): Promise<DetectorResult | null> {
+    const packageJson = await this.readPackageJson();
+    if (!packageJson) {
+      return null;
+    }
+
+    const allDeps = {
+      ...packageJson.dependencies,
+      ...packageJson.devDependencies,
+    } as Record<string, string>;
+
+    if (!allDeps['@modelcontextprotocol/sdk']) {
+      return null;
+    }
+
+    // Check for HTTP transport indicators
+    const hasExpress = Boolean(allDeps['express'] || allDeps['fastify'] || allDeps['hono'] || allDeps['@hono/node-server']);
+    const hasStreamableHttp = await this.grepSourceFiles('StreamableHTTPServerTransport');
+    const hasSseTransport = await this.grepSourceFiles('SSEServerTransport');
+
+    const isHttpTransport = hasExpress || hasStreamableHttp || hasSseTransport;
+
+    if (!isHttpTransport) {
+      return null;
+    }
+
+    const rootPackage = await this.getRootPackageName();
+    const hasTsconfig = await this.fileExists('tsconfig.json');
+
+    const indicators = ['package.json (@modelcontextprotocol/sdk)'];
+    if (hasExpress) indicators.push('HTTP server dependency');
+    if (hasStreamableHttp) indicators.push('StreamableHTTPServerTransport');
+    if (hasSseTransport) indicators.push('SSEServerTransport');
+
+    return {
+      type: 'mcp-server-http',
+      confidence: 92,
+      rootPackage,
+      buildTool: hasTsconfig ? 'tsc' : 'node',
+      indicators,
+    };
+  }
+
+  /**
+   * Search source files for a given string (used for transport detection)
+   */
+  private async grepSourceFiles(searchString: string): Promise<boolean> {
+    const sourcePatterns = ['src/**/*.ts', '*.ts', 'lib/**/*.ts'];
+    for (const pattern of sourcePatterns) {
+      const matches = await glob(pattern, { cwd: this.cwd });
+      for (const file of matches) {
+        try {
+          const content = await this.readFile(file);
+          if (content && content.includes(searchString)) {
+            return true;
+          }
+        } catch {
+          // skip unreadable files
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -564,6 +632,7 @@ export class ProjectDetector {
       'deno': 'JavaScript',
       'go': 'Go',
       'elixir': 'Elixir',
+      'mcp-server-http': 'TypeScript',
       'unknown': 'Unknown',
     };
 
@@ -615,6 +684,11 @@ export class ProjectDetector {
       'elixir': [
         'Run: ao init to generate Elixir optimized workflows',
         'Consider adding mix test and credo phases',
+      ],
+      'mcp-server-http': [
+        'Run: ao init to generate MCP HTTP server workflows',
+        'Consider adding transport health-check and tool-validation phases',
+        'See ao-docs for HTTP MCP transport configuration reference',
       ],
       'unknown': [],
     };

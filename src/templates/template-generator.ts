@@ -204,6 +204,12 @@ export class TemplateGenerator {
           { template: 'javascript-agents.yaml.hbs', outputPath: 'agents-javascript.yaml', description: 'JavaScript agents' },
           { template: 'javascript-phases.yaml.hbs', outputPath: 'phases-javascript.yaml', description: 'JavaScript phases' },
         ];
+      case 'mcp-server-http':
+        return [
+          ...baseFiles,
+          { template: 'mcp-server-http-agents.yaml.hbs', outputPath: 'agents-mcp-http.yaml', description: 'MCP HTTP server agents' },
+          { template: 'mcp-server-http-phases.yaml.hbs', outputPath: 'phases-mcp-http.yaml', description: 'MCP HTTP server phases' },
+        ];
       default:
         return baseFiles;
     }
