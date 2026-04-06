@@ -27,4 +27,5 @@ export default {
   coverageReporters: ['text', 'lcov', 'html'],
   testMatch: ['**/*.test.ts'],
   roots: ['<rootDir>/src'],
+  setupFiles: ['<rootDir>/src/test-setup.ts'],
 };
