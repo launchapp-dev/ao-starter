@@ -718,9 +718,9 @@ version = "0.1.0"`);
       const result = await runCli(['init', '--output', '/nonexistent/path', '--quiet']);
 
       expect(result.exitCode).not.toBe(0);
-      // Error should be shown
-      expect(result.stdout + result.stderr).toContain('ENOENT') ||
-        expect(result.stdout + result.stderr).toContain('Error');
+      // Error should be shown — ENOENT on macOS, EACCES on Linux CI
+      const output = result.stdout + result.stderr;
+      expect(output).toMatch(/ENOENT|EACCES|Error/);
     });
 
     it('should suppress output on templates in quiet mode', async () => {
