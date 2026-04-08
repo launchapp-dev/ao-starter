@@ -462,9 +462,6 @@ export async function initCommand(options: initOptions): Promise<void> {
         case 'PROMPT_CANCELLED':
           console.error(chalk.yellow('✗ Operation cancelled'));
           break;
-        case 'PROMPT_CANCELLED':
-          console.error(chalk.yellow('✗ Operation cancelled'));
-          break;
       }
     } else {
       logger.error('Error initializing AO workflows:');
